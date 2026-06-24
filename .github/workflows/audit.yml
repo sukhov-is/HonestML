@@ -1,0 +1,42 @@
+# Weekly dependency audit (ADR-0077 §2): new CVEs must not wait for a release.
+# A red run opens/updates a GitHub issue so the signal does not drown (operational.md).
+name: Audit
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  pip-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pip-audit build
+      - run: python -m build --wheel
+      # same scope as the release gate: installed wheel + the boosting extra (ADR-0077 §2)
+      - run: python -m venv /tmp/wheel-env && /tmp/wheel-env/bin/pip install "$(ls dist/*.whl)[boosting]"
+      - name: pip-audit (same scope and ignore list as the release gate)
+        id: audit
+        run: >
+          pip-audit -l --path /tmp/wheel-env/lib/python3.12/site-packages
+          $(sed -e 's/#.*//' -e '/^\s*$/d' -e 's/^/--ignore-vuln /' audits/pip-audit-ignore.txt | tr '\n' ' ')
+      - name: open issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="weekly pip-audit failed ($(date -u +%F))"
+          existing=$(gh issue list --search "weekly pip-audit failed in:title" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Still failing: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          else
+            gh issue create --title "$title" --body "See $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          fi

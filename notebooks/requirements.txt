@@ -1,0 +1,5 @@
+# notebook tooling on top of the project dev env (see README.md);
+# the kaggle CLI v2 is installed separately via `uv tool` (needs py>=3.11)
+ipykernel>=6
+papermill>=2.6
+nbformat>=5.10

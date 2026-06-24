@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Tooling caches
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.hypothesis/
+.import_linter_cache/
+
+# Docs build
+site/
+# docs/automl-productionization/
+
+# Environments
+.venv/
+venv/
+.env
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+.CLAUDE/
+
+# local working files, not for publication
+_legacy/
+catboost_info/
+benchmarks/results.json
+benchmarks/native_cat_gate_results.json
+
+# showcase notebook inputs/outputs (large Kaggle datasets, generated submissions)
+notebooks/data/
+notebooks/results/
+notebooks/.ipynb_checkpoints/
+
+# internal design/architecture packages (kept local, not published)
+docs/architecture/
+docs/audit/
+docs/implementation/

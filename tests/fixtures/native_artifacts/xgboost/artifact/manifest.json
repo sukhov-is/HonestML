@@ -1,0 +1,45 @@
+{
+  "artifact_version": 1,
+  "honestml_version": "fixture",
+  "created_at": "2026-06-12T15:38:46.918428+00:00",
+  "task": {
+    "kind": "binary",
+    "metric": null,
+    "positive_label": null,
+    "report_date": null,
+    "numeric_cat_max_unique": 20,
+    "numeric_id_rate": 0.95,
+    "numeric_id_min_unique": 100
+  },
+  "metric": "roc_auc",
+  "classes": [
+    0,
+    1
+  ],
+  "metric_average": null,
+  "early_stopping": false,
+  "best_model_id": "xgboost",
+  "band_member_ids": [],
+  "band_unstable": false,
+  "band_width": 1,
+  "winner_by_tiebreak": false,
+  "calibration": null,
+  "selection_mode": "raw",
+  "score_space": "raw_oof",
+  "holdout_score": null,
+  "ensemble": null,
+  "shipped_on": "dev",
+  "calibrator_file": null,
+  "model_type": "xgboost",
+  "model_file": "model.ubj",
+  "required_extra": "xgboost",
+  "checksums": {
+    "algo": "sha256",
+    "files": {
+      "schema.json": "90f2dab528f9d395157631dc7f48086522ab0d2a0460b0b9d58ccb989c8ecf7d",
+      "leaderboard.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "model.ubj": "76809695cbd1b0359c8d5c906965bf448039e871e8f1a95aae8bcef2da541529"
+    },
+    "manifest": "a61e063bea8b158416286421f47a3976382db3e44517b0815d127103b50409c8"
+  }
+}

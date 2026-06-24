@@ -1,0 +1,121 @@
+# Release pipeline (ADR-0077 §2): tag v* -> check -> build -> audit -> publish (OIDC)
+# -> GitHub Release (dist + SBOM). Minimal and isolated per the PyPI trusted-publishing
+# security model: id-token lives ONLY in the publish job; the `pypi` environment must
+# carry protection rules (see docs/releasing.md prerequisites).
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read  # reads the ci.yml run conclusion for the tagged SHA
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # triple version gate: tag == pyproject == honestml.__version__ (ADR-0077 §2)
+      - run: python scripts/check_tag_version.py "${GITHUB_REF}"
+      # "a release is cut from green main" is mechanics, not an assumption. NOTE: for an
+      # annotated tag GITHUB_SHA is the tag OBJECT — always peel to the commit first; the
+      # CI verdict is read from the ci.yml workflow run (NOT from check-runs of this SHA,
+      # which would include this very job and deadlock).
+      - name: tagged commit is on main with green CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(git rev-parse "${GITHUB_REF}^{commit}")
+          git merge-base --is-ancestor "$sha" origin/main
+          conclusion=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${sha}&status=completed" \
+            --jq '.workflow_runs[0].conclusion')
+          echo "ci.yml conclusion on ${sha}: ${conclusion:-<none>}"
+          test "${conclusion}" = "success"
+
+  build:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  # audit scope (ADR-0077 §2): the INSTALLED WHEEL + the boosting extra in a clean venv
+  # (the shipped runtime, not the dev environment); one tool for both the gate and the
+  # SBOM. The escape valve for a fix-less transitive CVE is the reviewed ignore-file.
+  audit:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - run: pip install pip-audit
+      - run: python -m venv /tmp/wheel-env && /tmp/wheel-env/bin/pip install "$(ls dist/*.whl)[boosting]"
+      - name: pip-audit gate (with reviewed ignore list)
+        run: >
+          pip-audit -l --path /tmp/wheel-env/lib/python3.12/site-packages
+          $(sed -e 's/#.*//' -e '/^\s*$/d' -e 's/^/--ignore-vuln /' audits/pip-audit-ignore.txt | tr '\n' ' ')
+      - name: SBOM (CycloneDX)
+        run: >
+          pip-audit -l --path /tmp/wheel-env/lib/python3.12/site-packages
+          $(sed -e 's/#.*//' -e '/^\s*$/d' -e 's/^/--ignore-vuln /' audits/pip-audit-ignore.txt | tr '\n' ' ')
+          --format cyclonedx-json --output sbom.cdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.cdx.json
+          if-no-files-found: error
+
+  publish:
+    needs: [check, build, audit]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # OIDC trusted publishing — ONLY this job (NFR-DLV-5)
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # creates the GitHub Release with dist + SBOM (ADR-0077 §2)
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: sbom
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "${GITHUB_REF_NAME}" dist/* sbom.cdx.json
+          -R "${GITHUB_REPOSITORY}" --generate-notes

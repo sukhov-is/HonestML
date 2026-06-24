@@ -1,0 +1,41 @@
+# Clean Architecture layer contracts (ADR-0004, ADR-0005).
+# Run with: lint-imports
+[importlinter]
+root_package = honestml
+include_external_packages = True
+
+[importlinter:contract:core-independence]
+name = Core domain depends on nothing outward and no frame/ML library
+type = forbidden
+source_modules =
+    honestml.core
+forbidden_modules =
+    honestml.application
+    honestml.adapters
+    honestml.composition
+    polars
+    pandas
+    sklearn
+    scipy
+    optuna
+    mlflow
+    catboost
+    lightgbm
+    xgboost
+    shap
+
+[importlinter:contract:layers]
+name = Dependencies point inward (composition -> application -> adapters -> core)
+type = layers
+layers =
+    honestml.composition
+    honestml.application
+    honestml.adapters
+    honestml.core
+
+[importlinter:contract:usecases-independent-of-adapters]
+name = Use-cases never name concrete adapters
+type = independence
+modules =
+    honestml.application
+    honestml.adapters

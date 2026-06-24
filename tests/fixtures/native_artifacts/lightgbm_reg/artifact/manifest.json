@@ -1,0 +1,42 @@
+{
+  "artifact_version": 1,
+  "honestml_version": "fixture",
+  "created_at": "2026-06-12T15:38:49.061057+00:00",
+  "task": {
+    "kind": "regression",
+    "metric": null,
+    "positive_label": null,
+    "report_date": null,
+    "numeric_cat_max_unique": 20,
+    "numeric_id_rate": 0.95,
+    "numeric_id_min_unique": 100
+  },
+  "metric": "rmse",
+  "classes": null,
+  "metric_average": null,
+  "early_stopping": false,
+  "best_model_id": "lightgbm",
+  "band_member_ids": [],
+  "band_unstable": false,
+  "band_width": 1,
+  "winner_by_tiebreak": false,
+  "calibration": null,
+  "selection_mode": "raw",
+  "score_space": "raw_oof",
+  "holdout_score": null,
+  "ensemble": null,
+  "shipped_on": "dev",
+  "calibrator_file": null,
+  "model_type": "lightgbm",
+  "model_file": "model.txt",
+  "required_extra": "lightgbm",
+  "checksums": {
+    "algo": "sha256",
+    "files": {
+      "schema.json": "90f2dab528f9d395157631dc7f48086522ab0d2a0460b0b9d58ccb989c8ecf7d",
+      "leaderboard.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "model.txt": "821881b808697f1f8ec854c03deb48cc7ba5dee3204f19aaeb1c9466d5c16012"
+    },
+    "manifest": "32aa25ccf1aa7fe8b63fba2509e3ea95cc314b510aae889bc272d51b15663f88"
+  }
+}

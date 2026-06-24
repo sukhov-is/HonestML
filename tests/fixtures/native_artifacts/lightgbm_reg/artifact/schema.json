@@ -1,0 +1,16 @@
+{
+  "roles": {
+    "f0": "numeric",
+    "f1": "numeric",
+    "f2": "numeric",
+    "f3": "numeric",
+    "__target__": "target"
+  },
+  "categories": {},
+  "numeric_nan": "keep",
+  "datetime_spec": null,
+  "frequency_encoding": null,
+  "target_encoding": null,
+  "intersections": null,
+  "selected_features": null
+}

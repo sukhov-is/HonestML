@@ -1,0 +1,5 @@
+# Reviewed pip-audit ignore list (ADR-0077 §2) — the escape valve of the release gate.
+# One vulnerability ID per line. Every entry REQUIRES a comment with the justification
+# and a review-by date; entries land only via PR + a CHANGELOG line.
+# Example:
+#   GHSA-xxxx-yyyy-zzzz  # false positive in <dep>: <why>; review by 2026-09-01

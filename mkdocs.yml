@@ -1,0 +1,53 @@
+site_name: honestml
+site_description: General tabular AutoML library (classification + regression)
+site_url: https://sukhov-is.github.io/HonestML/
+repo_url: https://github.com/sukhov-is/HonestML
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Guide:
+      - Data input: guide/data-input.md
+      - CV and honest selection: guide/cv-selection.md
+      - Presets, budget and resume: guide/presets-budget.md
+      - Feature engineering and selection: guide/feature-engineering-selection.md
+      - Hyperparameter tuning and ensembling: guide/hpo-ensembling.md
+      - Run reports and experiment tracking: guide/reports-tracking.md
+      - Artifacts, serving and ONNX export: guide/artifacts-serving.md
+  - API reference: api.md
+  - Correctness guide: correctness-guide.md
+  - Plugin contract: plugin-contract.md
+  - Releasing: releasing.md
+  - Versioning policy: versioning-policy.md
+
+# Internal records present in the docs tree but NOT built as site pages: ADRs and the
+# design/architecture packages are committed; the backlog and audit notes stay local.
+# (mkdocs reads docs/ from disk, so --strict needs every non-nav file excluded here.)
+exclude_docs: |
+  adr/
+  architecture/
+  audit/
+  backlog.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences
+
+plugins:
+  - search
+  # API reference from docstrings (ADR-0077 §4); the lazy PEP 562 barrels are resolved
+  # through their TYPE_CHECKING mirrors — force_inspection is the documented fallback
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: sphinx
+            show_source: false
+            force_inspection: true
+            filters: ["!^_"]
+            inherited_members: false

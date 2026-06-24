@@ -1,0 +1,41 @@
+# Honesty benchmark (ADR-0076 §4): manual dispatch + the release checklist item.
+# NOT in ci.yml on purpose — it must not run on every push/PR, and baseline drift
+# must be a conscious, reviewed action.
+name: Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      update_baseline:
+        description: "rewrite baseline.json (download the artifact and commit it + CHANGELOG)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    # baseline canonization (ADR-0076 §4): PINNED runner + frozen lockfile —
+    # the no-regress gate must measure the library, not PyPI version drift
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --frozen --extra dev --extra boosting
+      - name: run honesty benchmark
+        run: |
+          if [ "${{ github.event.inputs.update_baseline }}" = "true" ]; then
+            uv run python benchmarks/run.py --update-baseline
+          else
+            uv run python benchmarks/run.py --check
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: |
+            benchmarks/results.json
+            benchmarks/baseline.json
