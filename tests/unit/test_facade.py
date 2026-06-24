@@ -136,7 +136,9 @@ def test_non_greatest_positive_label_does_not_invert_score() -> None:
     X, y = make_classification(n_samples=200, n_features=6, n_informative=4, random_state=0)
     task = Task(kind="binary", positive_label=0)  # 0 is NOT the greatest label in {0, 1}
     m = AutoML(task=task, metric="roc_auc", random_state=0).fit(X, y)
-    assert m.leaderboard_[0].score > 0.8
+    # non-inversion is the point: a flipped P(positive) would collapse to ~0.2; the exact value
+    # drifts with numpy/BLAS across versions, so assert clearly-not-inverted, not a tight bound
+    assert m.leaderboard_[0].score > 0.7
 
 
 def test_period_carve_empty_dev_raises_configerror() -> None:

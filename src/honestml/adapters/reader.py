@@ -17,7 +17,7 @@ import pandas as pd
 import polars as pl
 
 from honestml.core.config import FEConfig
-from honestml.core.exceptions import ConfigError, MissingDependencyError, SchemaValidationError
+from honestml.core.exceptions import ConfigError, SchemaValidationError
 from honestml.core.logging import get_logger
 from honestml.core.schema import (
     CategoryTable,
@@ -171,11 +171,11 @@ class Reader:
             self._reject_duplicate_columns(list(X.columns))
             try:
                 return pl.from_pandas(X)
-            except ImportError as exc:
-                # polars needs pyarrow to convert a pandas frame with any non-numpy-backed (string/
-                # object) column — i.e. every real CSV. Surface the optional extra at the boundary
-                # instead of a raw polars ImportError deep in the stack (ADR-0008, finding #3).
-                raise MissingDependencyError("pyarrow") from exc
+            except ImportError:
+                # pandas 3.0 defaults string columns to an extension dtype that pl.from_pandas
+                # converts only through pyarrow; build the frame column-wise so pyarrow stays
+                # optional (ADR-0005). numpy-numeric/datetime columns keep the zero-copy path.
+                return self._from_pandas_without_pyarrow(X)
         if isinstance(X, np.ndarray):
             if X.ndim != 2:
                 raise SchemaValidationError(f"X must be 2-D, got {X.ndim}-D array")
@@ -189,6 +189,27 @@ class Reader:
         raise SchemaValidationError(
             f"unsupported X type {type(X).__name__}; expected pandas/polars/numpy"
         )
+
+    @staticmethod
+    def _from_pandas_without_pyarrow(X: pd.DataFrame) -> pl.DataFrame:
+        """Convert a pandas frame to polars column-wise, without pyarrow (ADR-0005).
+
+        ``pl.from_pandas`` needs pyarrow for any non-numpy-backed column — every pandas-3 default
+        string, plus nullable extension dtypes. numpy-backed numeric/datetime columns keep the
+        zero-copy path with NaN→null parity; everything else goes through ``tolist`` with pandas
+        NA mapped to ``None`` so polars infers the type natively.
+        """
+        columns: list[pl.Series] = []
+        for name in X.columns:
+            series = X[name]
+            dtype = series.dtype
+            if isinstance(dtype, np.dtype) and dtype.kind in "biufM":
+                columns.append(pl.Series(str(name), series.to_numpy(), nan_to_null=True))
+            else:
+                columns.append(
+                    pl.Series(str(name), [None if pd.isna(v) else v for v in series.tolist()])
+                )
+        return pl.DataFrame(columns)
 
     @staticmethod
     def _reject_duplicate_columns(names: list[str]) -> None:

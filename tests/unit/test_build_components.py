@@ -125,6 +125,7 @@ def test_nested_arbitration_resolves_splitter_with_compare() -> None:
 
 def test_fs_cost_warning_for_expensive_strategies(caplog) -> None:
     # NFR-FSH-2: enabling null_importance / shap logs a cost WARNING at build
+    pytest.importorskip("shap")  # the "shap" strategy instantiates ShapRanker (needs shap) at build
     from honestml.core import FeatureSelectionConfig
 
     with caplog.at_level("WARNING"):

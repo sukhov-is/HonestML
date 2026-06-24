@@ -116,7 +116,9 @@ ignore = ["E501"]
 # Mypy — strict on the domain core, lenient elsewhere (ADR-0004)
 # ---------------------------------------------------------------------------
 [tool.mypy]
-python_version = "3.10"
+# 3.12: numpy>=2.5 ships stubs using PEP 695 `type` statements that mypy parses only under a
+# 3.12 target; runtime 3.10 support is enforced by the test matrix + ruff (UP, target py310).
+python_version = "3.12"
 warn_unused_configs = true
 ignore_missing_imports = true
 warn_redundant_casts = true

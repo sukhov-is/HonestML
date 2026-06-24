@@ -12,7 +12,6 @@ from honestml.core import (
     ColumnRole,
     ConfigError,
     FeatureSchema,
-    MissingDependencyError,
     SchemaValidationError,
     Task,
 )
@@ -45,15 +44,17 @@ def test_duplicate_feature_names_rejected_numpy() -> None:
         )
 
 
-def test_pyarrow_missing_reraised_as_missing_dependency(monkeypatch: pytest.MonkeyPatch) -> None:
-    # finding #3: a pandas frame with a string column needs pyarrow for the polars conversion; a raw
-    # polars ImportError deep in the stack is re-raised as an actionable MissingDependencyError.
+def test_pandas_string_reads_without_pyarrow(monkeypatch: pytest.MonkeyPatch) -> None:
+    # pandas 3.0 defaults strings to an extension dtype pl.from_pandas converts only via pyarrow;
+    # the reader falls back to a column-wise conversion so pyarrow stays optional (ADR-0005).
     def _boom(_frame: object) -> object:
         raise ImportError("pyarrow is required for converting a pandas dataframe to Polars")
 
     monkeypatch.setattr(pl, "from_pandas", _boom)
-    with pytest.raises(MissingDependencyError, match="pyarrow"):
-        Reader(Task(kind="binary")).read(pd.DataFrame({"s": ["a", "b"]}), y=[0, 1])
+    ds = Reader(Task(kind="binary")).read(
+        pd.DataFrame({"s": ["a", "b", "a", "b"], "n": [1.0, 2.0, 3.0, 4.0]}), y=[0, 1, 0, 1]
+    )
+    assert ds.n_rows == 4
 
 
 def test_all_null_target_rejected() -> None:
