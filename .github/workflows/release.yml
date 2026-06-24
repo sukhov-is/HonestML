@@ -75,11 +75,11 @@ jobs:
       - run: python -m venv /tmp/wheel-env && /tmp/wheel-env/bin/pip install "$(ls dist/*.whl)[boosting]"
       - name: pip-audit gate (with reviewed ignore list)
         run: >
-          pip-audit -l --path /tmp/wheel-env/lib/python3.12/site-packages
+          pip-audit --path /tmp/wheel-env/lib/python3.12/site-packages
           $(sed -e 's/#.*//' -e '/^\s*$/d' -e 's/^/--ignore-vuln /' audits/pip-audit-ignore.txt | tr '\n' ' ')
       - name: SBOM (CycloneDX)
         run: >
-          pip-audit -l --path /tmp/wheel-env/lib/python3.12/site-packages
+          pip-audit --path /tmp/wheel-env/lib/python3.12/site-packages
           $(sed -e 's/#.*//' -e '/^\s*$/d' -e 's/^/--ignore-vuln /' audits/pip-audit-ignore.txt | tr '\n' ' ')
           --format cyclonedx-json --output sbom.cdx.json
       - uses: actions/upload-artifact@v4

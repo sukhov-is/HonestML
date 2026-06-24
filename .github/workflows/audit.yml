@@ -26,7 +26,7 @@ jobs:
       - name: pip-audit (same scope and ignore list as the release gate)
         id: audit
         run: >
-          pip-audit -l --path /tmp/wheel-env/lib/python3.12/site-packages
+          pip-audit --path /tmp/wheel-env/lib/python3.12/site-packages
           $(sed -e 's/#.*//' -e '/^\s*$/d' -e 's/^/--ignore-vuln /' audits/pip-audit-ignore.txt | tr '\n' ' ')
       - name: open issue on failure
         if: failure()
