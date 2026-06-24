@@ -35,7 +35,7 @@ y = ((df["usage"] > 1.0) | (df["plan"] == "pro")).astype(int).to_numpy()
 
 from_pandas = AutoML(task="binary", models=("baseline", "linear"), random_state=0).fit(df, y)
 from_polars = AutoML(task="binary", models=("baseline", "linear"), random_state=0).fit(
-    pl.from_pandas(df), y
+    pl.DataFrame(df.to_dict(orient="list")), y
 )
 from_numpy = AutoML(task="binary", models=("baseline", "linear"), random_state=0).fit(
     df[["age", "usage"]].to_numpy(), y

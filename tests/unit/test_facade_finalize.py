@@ -151,7 +151,14 @@ def test_finalize_with_feature_selection_predicts() -> None:
     """finalize must refit on the SELECTED subset (ds_full projected), else the shipped model's feature
     count diverges from its schema and predict breaks (ADR-0045 §2 train==inference; regression of the
     ds_full-projection blocker)."""
-    X, y = _data("binary")  # 6 features
+    from sklearn.datasets import make_classification
+
+    # 3 informative + 3 pure-noise so the top-3 subset captures all signal: it lands comfortably
+    # inside the significance band vs all-6 on every platform. The shared 4-informative data put the
+    # gate's keep decision on the band boundary, which flipped under macOS Accelerate BLAS floats.
+    X, y = make_classification(
+        n_samples=200, n_features=6, n_informative=3, n_redundant=0, random_state=0
+    )
     fs = FeatureSelectionConfig(strategy="random_probe", cutoff="top_k", top_k=3)
     model = AutoML(
         task="binary",
