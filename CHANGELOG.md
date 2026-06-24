@@ -12,6 +12,9 @@ First public release: a tabular AutoML library for binary/multiclass classificat
 regression, built around honest model selection — the score you see is the score you can
 expect in production.
 
+The honesty-benchmark baseline (`benchmarks/baseline.json`) is bootstrapped for this release;
+subsequent releases gate against it for no regress (see `docs/releasing.md`).
+
 ### Added
 - **Task and data input contract:** sklearn-compatible `AutoML` facade
   (`fit`/`predict`/`predict_proba`/`score`, works in `Pipeline`) over pandas/polars/numpy

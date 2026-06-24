@@ -1,0 +1,205 @@
+{
+  "benchmark_version": 1,
+  "datasets": {
+    "breast_cancer": {
+      "atol": 0.02,
+      "band_members": [
+        "linear"
+      ],
+      "greater_is_better": true,
+      "holdout_score": 0.980489,
+      "metric": "roc_auc",
+      "models": [
+        "baseline",
+        "catboost",
+        "lightgbm",
+        "linear",
+        "xgboost"
+      ],
+      "optimism": 0.01757,
+      "selection_score": 0.99806,
+      "task": "binary",
+      "winner": "linear"
+    },
+    "diabetes": {
+      "atol": 0.02,
+      "band_members": [
+        "linear",
+        "lightgbm"
+      ],
+      "greater_is_better": false,
+      "holdout_score": 50.50628,
+      "metric": "rmse",
+      "models": [
+        "baseline",
+        "catboost",
+        "lightgbm",
+        "linear",
+        "xgboost"
+      ],
+      "optimism": -5.519151,
+      "selection_score": 56.025431,
+      "task": "regression",
+      "winner": "linear"
+    },
+    "synth_binary": {
+      "atol": 0.02,
+      "band_members": [
+        "catboost"
+      ],
+      "greater_is_better": true,
+      "holdout_score": 0.931111,
+      "metric": "roc_auc",
+      "models": [
+        "baseline",
+        "catboost",
+        "lightgbm",
+        "linear",
+        "xgboost"
+      ],
+      "optimism": 0.015572,
+      "selection_score": 0.946683,
+      "task": "binary",
+      "winner": "catboost"
+    },
+    "synth_binary_imbalanced": {
+      "atol": 0.02,
+      "band_members": [
+        "lightgbm",
+        "xgboost",
+        "catboost"
+      ],
+      "greater_is_better": true,
+      "holdout_score": 0.737273,
+      "metric": "roc_auc",
+      "models": [
+        "baseline",
+        "catboost",
+        "lightgbm",
+        "linear",
+        "xgboost"
+      ],
+      "optimism": 0.102163,
+      "selection_score": 0.839436,
+      "task": "binary",
+      "winner": "lightgbm"
+    },
+    "synth_binary_noisy": {
+      "atol": 0.02,
+      "band_members": [
+        "catboost",
+        "lightgbm",
+        "xgboost"
+      ],
+      "greater_is_better": true,
+      "holdout_score": 0.94,
+      "metric": "roc_auc",
+      "models": [
+        "baseline",
+        "catboost",
+        "lightgbm",
+        "linear",
+        "xgboost"
+      ],
+      "optimism": 0.001614,
+      "selection_score": 0.941614,
+      "task": "binary",
+      "winner": "lightgbm"
+    },
+    "synth_multiclass": {
+      "atol": 0.02,
+      "band_members": [
+        "catboost"
+      ],
+      "greater_is_better": false,
+      "holdout_score": 0.376001,
+      "metric": "log_loss",
+      "models": [
+        "baseline",
+        "catboost",
+        "lightgbm",
+        "linear",
+        "xgboost"
+      ],
+      "optimism": -0.044327,
+      "selection_score": 0.420328,
+      "task": "multiclass",
+      "winner": "catboost"
+    },
+    "synth_regression": {
+      "atol": 0.02,
+      "band_members": [
+        "linear"
+      ],
+      "greater_is_better": false,
+      "holdout_score": 9.631004,
+      "metric": "rmse",
+      "models": [
+        "baseline",
+        "catboost",
+        "lightgbm",
+        "linear",
+        "xgboost"
+      ],
+      "optimism": -0.279613,
+      "selection_score": 9.910617,
+      "task": "regression",
+      "winner": "linear"
+    },
+    "synth_regression_skewed": {
+      "atol": 0.02,
+      "band_members": [
+        "catboost",
+        "lightgbm",
+        "linear",
+        "xgboost"
+      ],
+      "greater_is_better": false,
+      "holdout_score": 5.516755,
+      "metric": "rmse",
+      "models": [
+        "baseline",
+        "catboost",
+        "lightgbm",
+        "linear",
+        "xgboost"
+      ],
+      "optimism": -3.023315,
+      "selection_score": 8.54007,
+      "task": "regression",
+      "winner": "linear"
+    },
+    "wine": {
+      "atol": 0.02,
+      "band_members": [
+        "lightgbm",
+        "linear",
+        "catboost"
+      ],
+      "greater_is_better": false,
+      "holdout_score": 0.048531,
+      "metric": "log_loss",
+      "models": [
+        "baseline",
+        "catboost",
+        "lightgbm",
+        "linear",
+        "xgboost"
+      ],
+      "optimism": -0.041176,
+      "selection_score": 0.089706,
+      "task": "multiclass",
+      "winner": "linear"
+    }
+  },
+  "outer_holdout": 0.2,
+  "seed": 20260612,
+  "versions": {
+    "catboost": "1.2.10",
+    "honestml": "1.0.0",
+    "lightgbm": "4.6.0",
+    "numpy": "2.4.6",
+    "scikit-learn": "1.9.0",
+    "xgboost": "3.2.0"
+  }
+}
