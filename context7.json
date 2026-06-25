@@ -1,0 +1,12 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "HonestML",
+  "description": "Tabular AutoML for classification and regression built around honest model selection — the reported score matches production.",
+  "excludeFolders": ["docs/adr", "docs/architecture", "docs/audit"],
+  "excludeFiles": ["backlog.md", "releasing.md"],
+  "rules": [
+    "Primary API is the sklearn-compatible AutoML facade: AutoML(task=...).fit(X, y) then predict/predict_proba/score; it works inside a sklearn Pipeline.",
+    "Optional capabilities are extras: honestml[boosting] (catboost/lightgbm/xgboost), [shap], [optuna], [mlflow], [onnx], [report]. `import honestml` stays lightweight and a missing extra fails fast with the exact `pip install honestml[...]` hint.",
+    "Honest selection is the default: out-of-fold scoring with a seeded bootstrap equivalence band, so the simplest model statistically tied with the best wins and ties are disclosed."
+  ]
+}
