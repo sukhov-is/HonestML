@@ -21,8 +21,9 @@ jobs:
           python-version: "3.12"
       - run: pip install pip-audit build
       - run: python -m build --wheel
-      # same scope as the release gate: installed wheel + the boosting extra (ADR-0077 §2)
-      - run: python -m venv /tmp/wheel-env && /tmp/wheel-env/bin/pip install "$(ls dist/*.whl)[boosting]"
+      # same scope as the release gate: installed wheel + the boosting extra (ADR-0077 §2). Upgrade the
+      # venv bootstrap pip first — pip is the installer, not a shipped dep; its own advisories must not fail.
+      - run: python -m venv /tmp/wheel-env && /tmp/wheel-env/bin/python -m pip install --upgrade pip && /tmp/wheel-env/bin/pip install "$(ls dist/*.whl)[boosting]"
       - name: pip-audit (same scope and ignore list as the release gate)
         id: audit
         run: >

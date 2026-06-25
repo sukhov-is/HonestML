@@ -72,7 +72,9 @@ jobs:
           name: dist
           path: dist
       - run: pip install pip-audit
-      - run: python -m venv /tmp/wheel-env && /tmp/wheel-env/bin/pip install "$(ls dist/*.whl)[boosting]"
+      # upgrade the venv bootstrap pip first: pip is the installer, not a shipped dependency, so its
+      # OWN advisories must not fail the runtime audit (which gates the wheel + boosting, ADR-0077 §2)
+      - run: python -m venv /tmp/wheel-env && /tmp/wheel-env/bin/python -m pip install --upgrade pip && /tmp/wheel-env/bin/pip install "$(ls dist/*.whl)[boosting]"
       - name: pip-audit gate (with reviewed ignore list)
         run: >
           pip-audit --path /tmp/wheel-env/lib/python3.12/site-packages
