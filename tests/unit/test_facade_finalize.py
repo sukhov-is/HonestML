@@ -29,8 +29,17 @@ def _data(task: str = "binary", n: int = 150):
         return make_regression(n_samples=n, n_features=6, n_informative=4, random_state=0)
     from sklearn.datasets import make_classification
 
+    # clearly separable (class_sep=2, no label noise) so the linear model unambiguously beats the
+    # baseline on every platform: the holdout selection used to sit on the band boundary and flip
+    # under macOS Accelerate floats, making the finalize score-equality assertions non-deterministic
     return make_classification(
-        n_samples=n, n_features=6, n_informative=4, n_redundant=0, random_state=0
+        n_samples=n,
+        n_features=6,
+        n_informative=4,
+        n_redundant=0,
+        class_sep=2.0,
+        flip_y=0.0,
+        random_state=0,
     )
 
 

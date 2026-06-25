@@ -10,9 +10,9 @@ per dataset — the checker orients both the optimism and the holdout comparison
 The gate is NO REGRESS against the committed ``baseline.json`` (per-dataset
 tolerances); the absolute mean/max optimism per metric family is reported as a
 diagnostic, not gated (an initial run cannot certify itself, ADR-0076 §3).
-``results.json`` carries no timings — two runs in one environment are
-byte-identical; the baseline is generated/updated ONLY by the CI job
-(pinned environment via ``uv sync --frozen``), see README.md.
+``results.json`` carries no timings; the no-regress gate uses per-dataset atol because
+the boosting backends are not bit-identical across runs on multi-core. The baseline is
+generated/updated ONLY by the CI job (pinned environment via ``uv sync --frozen``), see README.md.
 """
 # ruff: noqa: T201  (a CLI tool: stdout IS the interface)
 
@@ -55,11 +55,16 @@ def _versions() -> dict[str, str]:
     return out
 
 
-def run_corpus(specs: tuple[DatasetSpec, ...] = CORPUS) -> dict:
+def run_corpus(
+    specs: tuple[DatasetSpec, ...] = CORPUS, *, models: tuple[str, ...] | None = None
+) -> dict:
+    # models=None keeps the full default zoo (the real benchmark); a fixed deterministic set
+    # (e.g. baseline+linear) lets the determinism test isolate runner-determinism from boosting.
     from honestml import AutoML, CVConfig
     from honestml.adapters import resolve_metric
 
     records: dict[str, dict] = {}
+    extra = {} if models is None else {"models": models}
     for spec in specs:
         print(f"[{spec.name}] fitting ...", flush=True)
         X, y = spec.load()
@@ -67,6 +72,7 @@ def run_corpus(specs: tuple[DatasetSpec, ...] = CORPUS) -> dict:
             task=spec.task,
             random_state=SEED,
             cv=CVConfig(outer_holdout=HOLDOUT),
+            **extra,
         ).fit(X, y)
         report = model.run_report_
         greater = bool(resolve_metric(report["metric"]).greater_is_better)
