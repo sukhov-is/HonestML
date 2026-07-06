@@ -186,6 +186,7 @@ def _run(
     ds=None,
     random_state=7,
     inner_splitter=None,
+    selected_features=None,
 ):
     _BUILT.clear()
     ds = ds or _ds(sample_weight=sample_weight)
@@ -205,14 +206,60 @@ def _run(
         fe=fe,
         sample_weight=sample_weight,
         budget=budget,
+        selected_features=selected_features,
     )
     return outcomes, tuner
 
 
 def test_inner_objective_sees_full_feature_width() -> None:
-    # the inner objective fits on the FULL DEV feature space (no FS projection, ADR-0062 §2a)
+    # selected_features=None keeps the legacy contract: the inner objective fits on the FULL DEV
+    # feature space (ADR-0062 §2a path, unchanged when FS is off)
     _run({"lightgbm": _SPACE}, ds=_ds(width=4))
     assert _BUILT and all(e.fit_width == 4 for e in _BUILT)
+
+
+def test_inner_objective_projects_to_selected_subset() -> None:
+    # ADR-0102: with the post-FS subset the objective fits on the pruned width, by NAME
+    _run({"lightgbm": _SPACE}, ds=_ds(width=4), selected_features=("f0", "f2"))
+    assert _BUILT and all(e.fit_width == 2 for e in _BUILT)
+
+
+def test_te_augments_full_width_before_projection(monkeypatch) -> None:
+    # ADR-0102: the TE step's positional lookups assume the FULL matrix -> the projection must
+    # happen strictly AFTER _augment_oof_te; the fits still see the pruned width
+    seen = {}
+
+    def _spy(
+        x_full,
+        dataset,
+        y,
+        positive,
+        oof_fold_index,
+        smoothing,
+        feature_names,
+        *,
+        time_ordered=False,
+    ):
+        seen["te_width"] = x_full.shape[1]
+        return x_full
+
+    monkeypatch.setattr(tuning_mod, "_augment_oof_te", _spy)
+
+    class _TESpec:
+        encodings = {"c": object()}
+
+    from honestml.core import FEConfig
+
+    ds = _ds(n=30, width=4)
+    ds.schema.target_encoding = _TESpec()
+    _run(
+        {"lightgbm": _SPACE},
+        fe=FEConfig(target_encoding=True),
+        ds=ds,
+        selected_features=("f0", "f3"),
+    )
+    assert seen["te_width"] == 4  # TE saw the full matrix
+    assert _BUILT and all(e.fit_width == 2 for e in _BUILT)  # fits saw the projected one
 
 
 def test_inner_objective_fits_on_inner_train_only() -> None:

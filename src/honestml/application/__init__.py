@@ -35,6 +35,7 @@ _SUBMODULES = {
     "FeatureSelectionReport": ".slice",
     "LeaderboardEntry": ".slice",
     "SliceResult": ".slice",
+    "TuningBundle": ".slice",
     "align_proba": ".projection",
     "design_matrix": ".slice",
     "project_for_metric": ".projection",
@@ -75,6 +76,7 @@ __all__ = [
     "FeatureSelectionReport",
     "FailedCandidate",
     "FeatureSelectionBundle",
+    "TuningBundle",
     "LeaderboardEntry",
     "EstimatorFactory",
 ]
@@ -117,6 +119,7 @@ if (
         FeatureSelectionReport,
         LeaderboardEntry,
         SliceResult,
+        TuningBundle,
         design_matrix,
         refit_best,
         resolve_positive,

@@ -96,6 +96,13 @@ def test_builtins_discovered_without_plugins() -> None:
     assert names == _BUILTIN_NAMES
 
 
+def test_default_on_flags() -> None:
+    # xgboost is the one builtin opted out of the models=None default selection; it stays
+    # registered, listed and explicitly requestable (default_on gates selection only)
+    by_name = model_registry().by_name()
+    assert {n for n, d in by_name.items() if not d.default_on} == {"xgboost"}
+
+
 def test_third_party_plugin_discovered(monkeypatch) -> None:
     _patch_entry_points(monkeypatch, [_descriptor("ext_model")])
     names = set(model_registry().by_name())

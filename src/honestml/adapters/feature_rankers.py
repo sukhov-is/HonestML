@@ -8,6 +8,10 @@ so this stays a pure ``rank(one matrix) -> scores`` adapter. The ranker-model is
 candidate estimators (estimator-agnostic subset, ADR-0043 §4). sklearn is a hard dependency, so the
 default catalog pulls no boosting extra and ``import honestml`` never grows (the impl-note refinement of
 ADR-0044 §2's illustrative "LightGBM": ExtraTrees is lighter and extra-free).
+
+NaN policy: the ranker-model is NaN-intolerant (unlike the candidates, whose imputation ADR-0078 covers),
+so every fit here median-imputes NaN per call from TRAIN statistics (:func:`_impute_train` /
+:func:`_impute_pair`); NaN-free data passes through untouched (same object — byte-identical runs).
 """
 
 from __future__ import annotations
@@ -22,16 +26,60 @@ from honestml.core import MissingDependencyError, Task
 
 # cheap fixed budget for a ranker-model (NFR-FS-5): far lighter than the candidate boosting budget
 _N_TREES = 100
+# forest FIT is bit-identical for any n_jobs (per-tree seeds are drawn sequentially before dispatch,
+# feature_importances_ is an ordered mean); predict accumulates in COMPLETION order under n_jobs>1,
+# so prediction stays sequential (see make_ranker_fit_predict).
+_N_JOBS = -1
+
+
+def _train_medians(x: np.ndarray, nan_mask: np.ndarray) -> np.ndarray:
+    """Per-column median over the non-NaN entries; an all-NaN column -> 0.0 (width never changes)."""
+    med = np.zeros(x.shape[1], dtype=np.float64)
+    has_value = ~nan_mask.all(axis=0)
+    if has_value.any():
+        med[has_value] = np.nanmedian(x[:, has_value], axis=0)
+    return med
+
+
+def _impute_train(x: np.ndarray) -> np.ndarray:
+    """Median-impute NaN in a TRAIN matrix; NaN-free input returns the SAME object (no copy).
+
+    The same-object fast path keeps NaN-free runs byte-identical (determinism benchmark). Categorical
+    code columns are NaN-free by construction, so the impute is a numeric-block concern only.
+    """
+    nan_mask = np.isnan(x)
+    if not nan_mask.any():
+        return x
+    return np.where(nan_mask, _train_medians(x, nan_mask), x)
+
+
+def _impute_pair(x_tr: np.ndarray, x_te: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Impute a train/test pair with medians computed from TRAIN only (leak-free, ADR-0078 logic).
+
+    Guards on NaN in either matrix (a NaN-free train still yields valid medians for a NaN test);
+    NaN-free pairs return the same objects.
+    """
+    tr_mask = np.isnan(x_tr)
+    te_mask = np.isnan(x_te)
+    if not (tr_mask.any() or te_mask.any()):
+        return x_tr, x_te
+    med = _train_medians(x_tr, tr_mask)
+    if tr_mask.any():
+        x_tr = np.where(tr_mask, med, x_tr)
+    if te_mask.any():
+        x_te = np.where(te_mask, med, x_te)
+    return x_tr, x_te
 
 
 def _fit_ranker_model(
     task: Task, x: np.ndarray, y: np.ndarray, random_state: int, sample_weight: np.ndarray | None
 ):
     """Fit the cheap estimator-agnostic ranker-model (ExtraTrees) on ``x`` (ADR-0043 §4)."""
+    x = _impute_train(x)
     model = (
-        ExtraTreesClassifier(n_estimators=_N_TREES, random_state=random_state, n_jobs=1)
+        ExtraTreesClassifier(n_estimators=_N_TREES, random_state=random_state, n_jobs=_N_JOBS)
         if task.is_classification
-        else ExtraTreesRegressor(n_estimators=_N_TREES, random_state=random_state, n_jobs=1)
+        else ExtraTreesRegressor(n_estimators=_N_TREES, random_state=random_state, n_jobs=_N_JOBS)
     )
     model.fit(x, y, sample_weight=sample_weight)
     return model
@@ -168,12 +216,19 @@ def make_ranker_fit_predict(
         sample_weight: np.ndarray | None,
         random_state: int,
     ) -> tuple[np.ndarray | None, np.ndarray, np.ndarray | None]:
+        x_tr, x_te = _impute_pair(x_tr, x_te)
         if task.is_classification:
-            clf = ExtraTreesClassifier(n_estimators=_N_TREES, random_state=random_state, n_jobs=1)
+            clf = ExtraTreesClassifier(
+                n_estimators=_N_TREES, random_state=random_state, n_jobs=_N_JOBS
+            )
             clf.fit(x_tr, y_tr, sample_weight=sample_weight)
+            # predict sums per-tree outputs in completion order under n_jobs>1 (ULP drift);
+            # fit parallelism is seed-deterministic, prediction must stay sequential.
+            clf.set_params(n_jobs=1)
             return clf.predict_proba(x_te), clf.predict(x_te), clf.classes_
-        reg = ExtraTreesRegressor(n_estimators=_N_TREES, random_state=random_state, n_jobs=1)
+        reg = ExtraTreesRegressor(n_estimators=_N_TREES, random_state=random_state, n_jobs=_N_JOBS)
         reg.fit(x_tr, y_tr, sample_weight=sample_weight)
+        reg.set_params(n_jobs=1)
         return None, reg.predict(x_te), None
 
     return fit_predict
@@ -298,6 +353,9 @@ class ShapRanker:
         import shap
 
         _check_non_empty(x)
+        # re-bind so the model, x_explain, the background and KMeans all see the SAME imputed matrix
+        # (attributions on a different matrix than the fit would be dishonest); the fit guard no-ops.
+        x = _impute_train(x)
         model = _fit_ranker_model(self._task, x, y, random_state, sample_weight)
         x_explain = x if self._max_samples is None else x[: self._max_samples]
         if self._perturbation == "interventional":

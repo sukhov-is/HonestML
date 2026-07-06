@@ -53,6 +53,7 @@ subclass).
 | `api_version` | `int` (default `1`) | plugin-contract version; newer than the installed registry supports → skipped with a WARNING (see "Versioning & deprecation"). |
 | `dist` | `str` (default `"<builtin>"`) | informational; a stable secondary sort key only (does not affect determinism). |
 | `requires` | `tuple[str, ...]` (default `()`) | top-level runtime module(s) the component needs. Empty = always available. See "Extras availability". |
+| `default_on` | `bool` (default `True`) | `False` keeps the component registered, listed and explicitly requestable, but excludes it from the `models=None` default selection (built-in example: `xgboost`). |
 
 ## The import-light rule
 
@@ -154,8 +155,9 @@ is simply not tuned.
 `importlib.util.find_spec` — **without importing** the heavy library:
 
 - **Default run** (`models=None`): a component is auto-included only when every `requires`
-  module is importable; otherwise it is silently skipped, so a lightweight install never fails
-  on models it cannot run.
+  module is importable AND its descriptor has `default_on=True`; otherwise it is silently
+  skipped, so a lightweight install never fails on models it cannot run and an opted-out
+  component (`xgboost`) never burns default-run budget.
 - **Explicit run** (`models=("catboost",)`): a name no descriptor provides raises `ConfigError`
   listing the available models; a known but uninstalled model fails fast with
   `MissingDependencyError` (`pip install honestml[catboost]`). The install hint names the

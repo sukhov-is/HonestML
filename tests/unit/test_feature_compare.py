@@ -148,6 +148,127 @@ def test_single_strategy_skips_carve() -> None:
     )
     assert out.winner == "solo" and out.winner_idx == (0, 2)
     assert calls == []  # N=1 -> no carve (ADR-0046 §3)
+    assert out.refine is None  # wrapper selectors are their own descent (ADR-0100)
+
+
+# --- cascade: ranker cut -> importance-ordered backward refinement (ADR-0100) ---
+
+
+class _FakeRanker:
+    """FeatureRanker fake: fixed scores, importance-style auto threshold (1/n)."""
+
+    def __init__(self, name: str, scores: np.ndarray) -> None:
+        self.name = name
+        self._scores = scores
+
+    def rank(self, x, y, *, categorical, random_state, sample_weight=None, groups=None):
+        return self._scores
+
+    def auto_threshold(self, n_features):
+        return 1.0 / n_features
+
+
+def _fit_predict_small(x_tr, y_tr, x_te, sample_weight, random_state):
+    # inverse of _fit_predict: a NARROWER subset scores higher -> the descent pays off
+    return None, np.full(x_te.shape[0], -float(x_te.shape[1])), None
+
+
+def _run_cascade(fit_predict, cfg, *, n=40, n_features=4):
+    rng = np.random.RandomState(0)
+    x, y = rng.random((n, n_features)), rng.random(n)
+    return compare_features(
+        _FakeDataset(n),
+        x,
+        y,
+        task=_FakeTask(),
+        metric=_FakeMetric(),
+        strategies=[("importance", _FakeRanker("importance", np.array([0.4, 0.3, 0.2, 0.1])))],
+        config=cfg,
+        splitter=_FakeSplitter(),
+        carve=_carve,
+        fit_predict=fit_predict,
+        categorical=np.zeros(n_features, dtype=bool),
+        feature_names=[f"f{i}" for i in range(n_features)],
+        sample_weight=None,
+        random_state=42,
+    )
+
+
+def test_cascade_refines_to_compact_subset() -> None:
+    # top_frac=1.0 keeps all 4 -> cap 3 -> descent to the floor; with no significance test the band
+    # collapses to argmax, and _fit_predict_small makes the most compact point win
+    cfg = FeatureSelectionConfig(
+        compare=("importance",), cutoff="top_frac", top_frac=1.0,
+        refine_max_features=3, refine_drop_frac=0.34,
+    )
+    out = _run_cascade(_fit_predict_small, cfg)
+    assert out.winner_idx == (0,)  # strongest stage-1 feature survives to the floor
+    assert out.refine == {
+        "n_after_rank": 4,
+        "n_after_refine": 1,
+        "trajectory_len": 3,  # (0,1,2,3) -> capped (0,1,2) -> (0,)
+        "capped": True,
+    }
+
+
+def test_cascade_band_anchor_vetoes_harmful_cap() -> None:
+    # under the wider-is-better _fit_predict the argmax is trajectory[0] — the UNCAPPED survivor
+    # set — so a harmful refine_max_features truncation is refused, never silently applied
+    cfg = FeatureSelectionConfig(
+        compare=("importance",), cutoff="top_frac", top_frac=1.0,
+        refine_max_features=3, refine_drop_frac=0.34,
+    )
+    out = _run_cascade(_fit_predict, cfg)
+    assert out.winner_idx == (0, 1, 2, 3)
+    assert out.refine is not None and out.refine["n_after_refine"] == out.refine["n_after_rank"]
+
+
+def test_cascade_refine_off_keeps_single_cut() -> None:
+    cfg = FeatureSelectionConfig(compare=("importance",), cutoff="top_k", top_k=2, refine=False)
+    out = _run_cascade(_fit_predict_small, cfg)
+    assert out.winner_idx == (0, 1)  # pure cutoff, no descent
+    assert out.refine is None
+
+
+def test_cascade_respects_floor() -> None:
+    cfg = FeatureSelectionConfig(
+        compare=("importance",), cutoff="top_frac", top_frac=1.0, seq_min_features=2,
+    )
+    out = _run_cascade(_fit_predict_small, cfg)
+    assert len(out.winner_idx) == 2  # descent stops at the seq_min_features floor
+    assert out.refine is not None and out.refine["n_after_refine"] == 2
+
+
+def test_cascade_runs_per_strategy_in_holdout_compare() -> None:
+    # two rankers compete; each runs its own cascade and the winner's refine meta is reported
+    rng = np.random.RandomState(0)
+    n, n_features = 40, 4
+    x, y = rng.random((n, n_features)), rng.random(n)
+    cfg = FeatureSelectionConfig(
+        compare=("importance", "random_probe"), selection_holdout=0.3,
+        cutoff="top_frac", top_frac=1.0, refine_drop_frac=0.5,
+    )
+    out = compare_features(
+        _FakeDataset(n),
+        x,
+        y,
+        task=_FakeTask(),
+        metric=_FakeMetric(),
+        strategies=[
+            ("importance", _FakeRanker("importance", np.array([0.4, 0.3, 0.2, 0.1]))),
+            ("random_probe", _FakeRanker("random_probe", np.array([0.1, 0.2, 0.3, 0.4]))),
+        ],
+        config=cfg,
+        splitter=_FakeSplitter(),
+        carve=_carve,
+        fit_predict=_fit_predict_small,
+        categorical=np.zeros(n_features, dtype=bool),
+        feature_names=[f"f{i}" for i in range(n_features)],
+        sample_weight=None,
+        random_state=42,
+    )
+    assert out.winner in ("importance", "random_probe")
+    assert out.refine is not None and out.refine["n_after_refine"] == 1
 
 
 def test_strategy_failure_fails_fast() -> None:

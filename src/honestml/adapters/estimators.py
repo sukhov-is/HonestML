@@ -23,14 +23,21 @@ from honestml.core.exceptions import NotFittedError
 from honestml.core.ports.model_spec import Capabilities
 
 # handles_cat=False: codes are fed as numeric columns (native cat is a follow-up).
-# handles_missing=True: a median SimpleImputer prefixes the Pipeline, fit per-fold and leak-free
-# (ADR-0078) — NaN no longer evicts the simple candidates from the zoo (finding #6).
+# handles_missing=True: the linear models impute via a per-fold median SimpleImputer (ADR-0078);
+# the baselines ignore X entirely (constant stand-in, no imputer pass) — NaN no longer evicts
+# the simple candidates from the zoo (finding #6).
 _CLF_CAPS = Capabilities(
     tasks=("binary", "multiclass"), probabilistic=True, handles_cat=False, handles_missing=True
 )
 _REG_CAPS = Capabilities(
     tasks=("regression",), probabilistic=False, handles_cat=False, handles_missing=True
 )
+
+
+def _const_x(n: int) -> np.ndarray:
+    """Constant stand-in X for the Dummy models: prior/mean depend only on ``y``/``sample_weight``,
+    so sklearn's X validation never sees the real matrix (NaN-safe without an imputer pass)."""
+    return np.zeros((n, 1))
 
 
 class BaselineClassifier:
@@ -40,7 +47,7 @@ class BaselineClassifier:
 
     def __init__(self) -> None:
         self.feature_names: list[str] = []
-        self._model: Pipeline | None = None
+        self._model: DummyClassifier | None = None
         self.classes_: np.ndarray | None = None
 
     def fit(
@@ -51,26 +58,19 @@ class BaselineClassifier:
         y_val: np.ndarray | None = None,
         sample_weight: np.ndarray | None = None,
     ) -> BaselineClassifier:
-        # the imputer makes the prior baseline NaN-safe (ADR-0078); Dummy ignores X but sklearn
-        # still validates it, so raw NaN would raise without it.
-        model = Pipeline(
-            [
-                ("imputer", SimpleImputer(strategy="median")),
-                ("dummy", DummyClassifier(strategy="prior")),
-            ]
-        )
-        model.fit(X, y, dummy__sample_weight=sample_weight)
+        model = DummyClassifier(strategy="prior")
+        model.fit(_const_x(len(y)), y, sample_weight=sample_weight)
         self._model = model
         self.classes_ = model.classes_
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        return self._fitted().predict(X)
+        return self._fitted().predict(_const_x(X.shape[0]))
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        return self._fitted().predict_proba(X)
+        return self._fitted().predict_proba(_const_x(X.shape[0]))
 
-    def _fitted(self) -> Pipeline:
+    def _fitted(self) -> DummyClassifier:
         if self._model is None:
             raise NotFittedError(f"{type(self).__name__} is not fitted; call fit() first")
         return self._model
@@ -83,7 +83,7 @@ class BaselineRegressor:
 
     def __init__(self) -> None:
         self.feature_names: list[str] = []
-        self._model: Pipeline | None = None
+        self._model: DummyRegressor | None = None
 
     def fit(
         self,
@@ -93,20 +93,15 @@ class BaselineRegressor:
         y_val: np.ndarray | None = None,
         sample_weight: np.ndarray | None = None,
     ) -> BaselineRegressor:
-        model = Pipeline(
-            [
-                ("imputer", SimpleImputer(strategy="median")),
-                ("dummy", DummyRegressor(strategy="mean")),
-            ]
-        )
-        model.fit(X, y, dummy__sample_weight=sample_weight)
+        model = DummyRegressor(strategy="mean")
+        model.fit(_const_x(len(y)), y, sample_weight=sample_weight)
         self._model = model
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        return self._fitted().predict(X)
+        return self._fitted().predict(_const_x(X.shape[0]))
 
-    def _fitted(self) -> Pipeline:
+    def _fitted(self) -> DummyRegressor:
         if self._model is None:
             raise NotFittedError(f"{type(self).__name__} is not fitted; call fit() first")
         return self._model

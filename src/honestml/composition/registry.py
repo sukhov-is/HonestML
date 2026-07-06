@@ -86,7 +86,8 @@ class ComponentDescriptor:
     (ADR-0019 §1). ``api_version`` lets the registry skip future-contract plugins instead of
     crashing. ``requires`` lists the runtime module(s) the component needs; an empty tuple
     means always available (core/sklearn). The registry checks ``requires`` via ``find_spec``
-    for default selection (ADR-0020 §5).
+    for default selection (ADR-0020 §5). ``default_on=False`` keeps the component registered,
+    listed and explicitly requestable, but excluded from the ``models=None`` default selection.
     """
 
     name: str
@@ -95,6 +96,7 @@ class ComponentDescriptor:
     api_version: int = 1
     dist: str = _BUILTIN_DIST
     requires: tuple[str, ...] = ()
+    default_on: bool = True
 
 
 def _build_baseline(*, task: Task, random_state: int) -> Estimator:
@@ -150,6 +152,10 @@ def _builtin_models() -> list[ComponentDescriptor]:
             ),
             build=partial(build_boosting, XGBOOST),
             requires=("xgboost",),
+            # opted out of the default zoo: never outperforms catboost/lightgbm on the honesty
+            # benchmarks, no native categorical handling (handles_cat=False, ADR-0087), and burns
+            # HPO/CV budget; explicit models=("xgboost", ...) still selects it.
+            default_on=False,
         ),
     ]
 

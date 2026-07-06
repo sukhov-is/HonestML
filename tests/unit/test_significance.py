@@ -47,6 +47,38 @@ def test_delta_distribution_ignores_uncovered_rows() -> None:
     assert np.allclose(base, sig._delta_distribution(a2, b2, y, None, blocks))
 
 
+def test_block_bootstrap_memoization_is_byte_identical() -> None:
+    # the block branch memoizes repeated ORDERED draws (few folds -> few distinct resamples);
+    # the deltas array must stay byte-identical to an unmemoized reference and the metric must
+    # be evaluated at most 2×(distinct draws) times (one pair of score calls per unique draw)
+    class _CountingMean(_MeanScore):
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def score(self, y_true, y_pred, sample_weight=None):
+            self.calls += 1
+            return super().score(y_true, y_pred, sample_weight)
+
+    rng = np.random.default_rng(2)
+    n = 60
+    y = np.zeros(n)
+    a, b = rng.normal(size=n), rng.normal(size=n)
+    blocks = np.repeat([0, 1, 2], 20)  # 3 blocks -> at most 27 distinct ordered draws
+    counting = _CountingMean()
+    sig = BootstrapSignificanceTest(metric=counting, n_boot=500, seed=0)
+    deltas = sig._delta_distribution(a, b, y, None, blocks)
+    assert counting.calls <= 2 * 27
+    # unmemoized reference: replay the same RNG sequence by hand
+    ref_rng = np.random.default_rng(0)
+    idx_blocks = [np.flatnonzero(blocks == i) for i in range(3)]
+    ref = np.empty(500)
+    for i in range(500):
+        chosen = ref_rng.integers(0, 3, size=3)
+        idx = np.concatenate([idx_blocks[j] for j in chosen])
+        ref[i] = np.mean(b[idx]) - np.mean(a[idx])
+    assert np.array_equal(deltas, ref)
+
+
 def test_typeI_equivalent_share_band() -> None:
     """Two equivalent models (same signal, independent noise) -> declared equivalent."""
     rng = np.random.default_rng(0)

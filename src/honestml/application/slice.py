@@ -43,6 +43,7 @@ from honestml.core import (
     SupportsNativeCategorical,
     Task,
     TimeOrderedSplitter,
+    TuneOutcome,
     equivalence_band,
     get_logger,
     rank,
@@ -128,6 +129,8 @@ class FeatureSelectionReport:
     # in-sequential band of the winning wrapper selector (ADR-0086 §1), distinct from the
     # strategy-arbitration band (winner_rule/band_members). None unless the winner is sequential w/ band.
     seq_band: dict[str, object] | None = None
+    # cascade refinement stage sizes of the winner (ADR-0100); None when refinement did not run.
+    refine: dict[str, object] | None = None
 
 
 @dataclass
@@ -176,6 +179,9 @@ class SliceResult:
     # period CV split diagnostics (ADR-0096 §4): {period, n_periods, n_folds, n_dropped_empty} for a
     # timeseries_period run (None otherwise), surfaced in the run-report `cv` block for a truthful manifest.
     cv_split: dict[str, object] | None = None
+    # HPO outcomes when tuning ran inside the slice (ADR-0102, post-FS objective); the facade folds the
+    # tuned factories into its estimator mapping for refit/ensemble and builds the hpo report from this.
+    hpo: dict[str, TuneOutcome] | None = None
 
 
 class _CandidateFailed(Exception):
@@ -333,6 +339,21 @@ def _augment_oof_te(
 
 
 @dataclass(frozen=True)
+class TuningBundle:
+    """The HPO injectables passed to :func:`run_slice` as one unit (ADR-0102).
+
+    ``tune(dataset, selected_features)`` runs the inner-CV search AFTER the FS block, so the
+    objective sees the post-FS width (supersedes ADR-0062 §2a); ``tuned_factories`` maps the
+    outcomes to estimator-factory updates (replace, or ``{name}__tuned`` append) exactly like the
+    facade's legacy write-back. Both are closures composed in the facade — injection, not import:
+    ``tuning.py`` imports from this module, so calling it here directly would be a cycle.
+    """
+
+    tune: Callable[[Dataset, tuple[str, ...] | None], dict[str, TuneOutcome]]
+    tuned_factories: Callable[[dict[str, TuneOutcome]], dict[str, EstimatorFactory]]
+
+
+@dataclass(frozen=True)
 class FeatureSelectionBundle:
     """The feature-selection injectables passed to :func:`run_slice` as one unit (ADR-0044/0046).
 
@@ -371,6 +392,7 @@ def run_slice(
     capture_proba: bool = False,
     fe: FEConfig | None = None,
     features: FeatureSelectionBundle | None = None,
+    tuning: TuningBundle | None = None,
     budget: Budget | None = None,
     cache: CandidateCache | None = None,
     ctx: RunContext | None = None,
@@ -468,6 +490,7 @@ def run_slice(
     fold_subset_jaccard: float | None = None
     per_strategy_mean_features: tuple[tuple[str, float], ...] | None = None
     seq_band: dict[str, object] | None = None
+    fs_refine: dict[str, object] | None = None
     # per-row structure label for structure-aware null_importance (M6d, ADR-0050): reuse the group/time
     # arrays already derived above; None (i.i.d. scheme) keeps the M6c uniform permutation.
     feature_groups = (
@@ -546,6 +569,7 @@ def run_slice(
         fold_subset_jaccard = outcome.fold_subset_jaccard
         per_strategy_mean_features = outcome.per_strategy_mean_features or None
         seq_band = outcome.seq_band
+        fs_refine = outcome.refine
         # M6f (ADR-0059 §1a): merge the winner's per-fold block-fragmentation aggregate into the full-DEV
         # null_block_stats (built above) so the honesty metric reflects the smaller per-fold trains too.
         if outcome.per_fold_block_stats is not None:
@@ -605,6 +629,15 @@ def run_slice(
         x_full = x_full[:, list(fs_idx)]
         feature_names = [feature_names[i] for i in fs_idx]
         n_features = len(feature_names)
+
+    # HPO stage (ADR-0102, supersedes ADR-0062 §2a): tune INSIDE the slice, after the FS projection,
+    # so the inner objective sees the post-FS width; FS off passes None -> the legacy full-DEV
+    # objective, statement-for-statement. Tuned factories replace (or `__tuned`-augment) the
+    # candidates before the loop below, exactly like the facade's legacy write-back.
+    hpo_outcomes: dict[str, TuneOutcome] | None = None
+    if tuning is not None:
+        hpo_outcomes = tuning.tune(dataset, selected_features)
+        estimators = {**estimators, **tuning.tuned_factories(hpo_outcomes)}
 
     # native-categorical routing (ADR-0087/0088/0092, FR-1/FR-2/FR-3): the cardinality-GATED verdict over
     # the frozen schema, computed ONCE here; positions of the natively-routed CATEGORICAL columns in the
@@ -797,12 +830,14 @@ def run_slice(
                 fold_subset_jaccard=fold_subset_jaccard,
                 per_strategy_mean_features=per_strategy_mean_features,
                 seq_band=seq_band,
+                refine=fs_refine,
             )
             if selected_features is not None
             else None
         ),
         native_routing=native_routing_verdict,
         cv_split=cv_split,
+        hpo=hpo_outcomes,
     )
 
 

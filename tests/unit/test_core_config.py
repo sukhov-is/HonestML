@@ -504,5 +504,23 @@ def test_fs_config_fields_pinned() -> None:
         "null_percentile",
         "seq_min_features",
         "seq_patience",
+        "refine",
+        "refine_max_features",
+        "refine_drop_frac",
         "random_state",
     }
+
+
+def test_fs_refine_defaults_and_validator() -> None:
+    # ADR-0100: the cascade is on by default; the refine_* knobs are dead config under refine=False
+    fs = FeatureSelectionConfig()
+    assert fs.refine is True and fs.refine_max_features == 200 and fs.refine_drop_frac == 0.05
+    assert FeatureSelectionConfig(refine=False).refine is False  # opt-out alone is valid
+    # sequential wrapper with the default refine=True stays valid (WARNING at composition, not error)
+    assert FeatureSelectionConfig(strategy="sequential").refine is True
+    with pytest.raises(ValueError, match="refine=False"):
+        FeatureSelectionConfig(refine=False, refine_max_features=100)
+    with pytest.raises(ValueError, match="refine=False"):
+        FeatureSelectionConfig(refine=False, refine_drop_frac=0.1)
+    with pytest.raises(ValueError):
+        FeatureSelectionConfig(refine_drop_frac=1.0)  # lt=1

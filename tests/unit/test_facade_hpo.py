@@ -113,10 +113,37 @@ def test_hpo_block_value_assertions() -> None:
     m = _fit(HPOConfig(n_trials=5, inner_cv=3))
     block = m.run_report_["hpo"]
     assert block["selection_oof_is_post_tuning"] is True
-    assert block["tuned_on_full_feature_space"] is False  # no FS in this run
+    assert block["tuned_on_full_feature_space"] is False  # pinned False since ADR-0102
+    assert block["tuned_on"] == "dev_full"  # no FS in this run
     assert block["deterministic"] is True  # trials-mode (no timeout)
     assert block["cost_estimate_fits"] == 1 * 5 * 3  # Σ n_models × n_trials × inner_cv (NFR-M7-7)
     assert block["tuned"]["tunable"]["n_trials_run"] == 5
+
+
+def test_hpo_with_fs_tunes_on_pruned_width_and_ships_tuned(monkeypatch) -> None:
+    # ADR-0102: with FS on, tuning runs after the FS projection — the objective width is the
+    # selected subset — and the SHIPPED estimator carries the tuned params (the write-back-after-
+    # run_slice trap: forgetting the fold-back would refit an untuned winner).
+    from honestml.core import FeatureSelectionConfig
+
+    widths: list[int] = []
+    real_fit = _TunableClf.fit
+
+    def spy_fit(self, X, y, X_val=None, y_val=None, sample_weight=None):
+        widths.append(X.shape[1])
+        return real_fit(self, X, y, X_val=X_val, y_val=y_val, sample_weight=sample_weight)
+
+    monkeypatch.setattr(_TunableClf, "fit", spy_fit)
+    m = _fit(
+        HPOConfig(n_trials=3, inner_cv=2),
+        feature_selection=FeatureSelectionConfig(cutoff="top_k", top_k=3, refine=False),
+    )
+    block = m.run_report_["hpo"]
+    assert block["tuned_on"] == "fs_subset"
+    assert m.schema_.selected_features is not None and len(m.schema_.selected_features) == 3
+    assert widths and all(w == 3 for w in widths)  # every fit (HPO trials, CV, refit) post-FS width
+    chosen_c = block["tuned"]["tunable"]["chosen_params"]["C"]
+    assert m.fitted_.estimator.C == chosen_c  # the shipped winner carries the tuned params
 
 
 def test_deterministic_false_under_time_budget() -> None:

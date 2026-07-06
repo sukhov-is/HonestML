@@ -313,3 +313,145 @@ def test_ranker_fit_predict_classification_and_regression() -> None:
         xr[:70], yr[:70], xr[70:], None, 0
     )
     assert rproba is None and rclasses is None and rpred.shape == (30,)
+
+
+# --- NaN-safe ranker-model: median impute from TRAIN statistics (module docstring policy) ---
+
+
+def _signal_noise_nan(n: int = 200) -> tuple[np.ndarray, np.ndarray]:
+    """_signal_noise with ~15% NaN in both columns; the signal stays detectable."""
+    x, y = _signal_noise(n)
+    nan_mask = np.random.default_rng(1).random(x.shape) < 0.15
+    x = x.copy()
+    x[nan_mask] = np.nan
+    return x, y
+
+
+def test_importance_ranker_handles_nan() -> None:
+    x, y = _signal_noise_nan()
+    imp = ImportanceRanker(_BIN).rank(x, y, categorical=_NOCAT, random_state=0)
+    assert imp.shape == (2,) and bool(np.all(np.isfinite(imp)))
+    assert imp[0] > imp[1]
+
+
+def test_null_importance_handles_nan() -> None:
+    x, y = _signal_noise_nan()
+    margin = NullImportanceRanker(_BIN, n_runs=5).rank(x, y, categorical=_NOCAT, random_state=0)
+    assert margin.shape == (2,) and bool(np.all(np.isfinite(margin)))
+
+
+def test_random_probe_handles_nan() -> None:
+    # covers the hstack([x, probes]) path: probes are NaN-free, x is not
+    x, y = _signal_noise_nan()
+    margin = RandomProbeRanker(_BIN).rank(x, y, categorical=_NOCAT, random_state=0)
+    assert margin.shape == (2,) and bool(np.all(np.isfinite(margin)))
+
+
+def test_shap_ranker_handles_nan() -> None:
+    pytest.importorskip("shap")
+    x, y = _signal_noise_nan()
+    tpd = ShapRanker(_BIN).rank(x, y, categorical=_NOCAT, random_state=0)
+    assert tpd.shape == (2,) and bool(np.all(np.isfinite(tpd)))
+    # interventional + kmeans: the KMeans background must see the imputed matrix too
+    inter = ShapRanker(
+        _BIN, perturbation="interventional", background_samples=12, shap_background="kmeans"
+    ).rank(x, y, categorical=_NOCAT, random_state=0)
+    assert inter.shape == (2,) and bool(np.all(np.isfinite(inter)))
+
+
+def test_ranker_fit_predict_handles_nan() -> None:
+    x, y = _signal_noise_nan(120)
+    proba, pred, classes = make_ranker_fit_predict(_BIN)(x[:80], y[:80], x[80:], None, 0)
+    assert proba is not None and bool(np.all(np.isfinite(proba))) and classes is not None
+    rng = np.random.default_rng(2)
+    xr = rng.normal(size=(100, 2))
+    xr[rng.random(xr.shape) < 0.15] = np.nan
+    yr = np.where(np.isnan(xr[:, 0]), 0.0, xr[:, 0]) + rng.normal(scale=0.1, size=100)
+    rproba, rpred, _ = make_ranker_fit_predict(Task(kind="regression"))(
+        xr[:70], yr[:70], xr[70:], None, 0
+    )
+    assert rproba is None and bool(np.all(np.isfinite(rpred)))
+
+
+def test_ranker_fit_predict_nan_only_in_test() -> None:
+    # the pair-guard edge: a NaN-free train still yields valid medians for a NaN test
+    x, y = _signal_noise(120)
+    x_te = x[80:].copy()
+    x_te[::3, 0] = np.nan
+    proba, pred, _ = make_ranker_fit_predict(_BIN)(x[:80], y[:80], x_te, None, 0)
+    assert proba is not None and bool(np.all(np.isfinite(proba)))
+
+
+def test_impute_pair_uses_train_medians() -> None:
+    # the leak pin: test NaN is filled with the TRAIN column median, never the test/pooled one
+    from honestml.adapters.feature_rankers import _impute_pair
+
+    x_tr = np.array([[1.0], [2.0], [3.0], [np.nan]])
+    x_te = np.array([[100.0], [np.nan]])
+    out_tr, out_te = _impute_pair(x_tr, x_te)
+    assert out_tr[3, 0] == 2.0 and out_te[1, 0] == 2.0
+
+
+def test_impute_fast_path_is_same_object() -> None:
+    # the byte-identity pin: NaN-free input passes through as the SAME object (no copy, no dtype churn)
+    from honestml.adapters.feature_rankers import _impute_pair, _impute_train
+
+    x = np.random.default_rng(0).standard_normal((10, 3))
+    assert _impute_train(x) is x
+    x_te = x[:4]
+    a, b = _impute_pair(x, x_te)
+    assert a is x and b is x_te
+
+
+def test_impute_all_nan_column_is_zero() -> None:
+    import warnings
+
+    from honestml.adapters.feature_rankers import _impute_train
+
+    x = np.array([[1.0, np.nan], [3.0, np.nan]])
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # nanmedian over an all-NaN column would RuntimeWarning
+        out = _impute_train(x)
+    assert out[:, 1].tolist() == [0.0, 0.0] and out[:, 0].tolist() == [1.0, 3.0]
+
+
+def test_nan_rank_is_deterministic() -> None:
+    x, y = _signal_noise_nan()
+    r = ImportanceRanker(_BIN)
+    a = r.rank(x, y, categorical=_NOCAT, random_state=7)
+    b = r.rank(x, y, categorical=_NOCAT, random_state=7)
+    assert np.array_equal(a, b)
+
+
+# --- parallel-fit determinism (_N_JOBS=-1): fit/importances are seed-deterministic for any n_jobs ---
+
+
+def test_parallel_fit_rank_is_byte_identical() -> None:
+    x, y = _signal_noise(500)
+    for ranker in (ImportanceRanker(_BIN), NullImportanceRanker(_BIN, n_runs=5)):
+        a = ranker.rank(x, y, categorical=_NOCAT, random_state=0)
+        b = ranker.rank(x, y, categorical=_NOCAT, random_state=0)
+        assert np.array_equal(a, b)
+    fp = make_ranker_fit_predict(_BIN)
+    pa, ca, _ = fp(x[:400], y[:400], x[400:], None, 0)
+    pb, cb, _ = fp(x[:400], y[:400], x[400:], None, 0)
+    assert pa is not None and pb is not None
+    assert np.array_equal(pa, pb) and np.array_equal(ca, cb)
+
+
+def test_fit_predict_predicts_sequentially(monkeypatch) -> None:
+    # prediction accumulates per-tree sums in completion order under n_jobs>1 (ULP drift) ->
+    # fit_predict must reset n_jobs=1 before predict/predict_proba
+    from sklearn.ensemble import ExtraTreesClassifier
+
+    seen: list[object] = []
+    real = ExtraTreesClassifier.predict
+
+    def spy(self, X):  # noqa: N803 - sklearn signature
+        seen.append(self.n_jobs)
+        return real(self, X)
+
+    monkeypatch.setattr(ExtraTreesClassifier, "predict", spy)
+    x, y = _signal_noise(80)
+    make_ranker_fit_predict(_BIN)(x[:60], y[:60], x[60:], None, 0)
+    assert seen == [1]

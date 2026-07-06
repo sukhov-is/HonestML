@@ -22,7 +22,9 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 
 from honestml.application import (
     EnsembleOutcome,
+    EstimatorFactory,
     FeatureSelectionBundle,
+    TuningBundle,
     build_run_report,
     ensemble_selection,
     refit_best,
@@ -45,6 +47,7 @@ from honestml.core import (
     Task,
     TimeOrderedSplitter,
     TrackerConfig,
+    TuneOutcome,
     get_logger,
 )
 from honestml.core.config import RunMode, SignificanceMode
@@ -78,13 +81,14 @@ def _packages_for(estimators: tuple[str, ...]) -> set[str]:
 
 
 def _hpo_report(
-    hpo: HPOConfig, outcomes: dict[str, Any], *, tuned_on_full: bool, time_budget: bool
+    hpo: HPOConfig, outcomes: dict[str, Any], *, tuned_on: str, time_budget: bool
 ) -> dict[str, Any]:
     """Assemble the additive run-report ``hpo`` block.
 
     Surfaces every non-default tuning choice: per-model chosen params + inner score + trials, the cost
     estimate (Σ n_trials × inner_cv), and the honesty disclosures (selection OOF is post-tuning;
-    tuned on the full feature space when FS is also on; determinism off under a time budget).
+    ``tuned_on`` names the objective width — ``"fs_subset"`` post-FS-projection vs ``"dev_full"``,
+    ADR-0102; determinism off under a time budget).
 
     ``deterministic`` is true only when NO finite Optuna timeout is imposed: neither an explicit
     ``hpo.timeout_s`` nor an active time budget, which forces a fair-share wall-clock cap even when
@@ -95,7 +99,10 @@ def _hpo_report(
         "inner_cv": hpo.inner_cv,
         "deterministic": hpo.timeout_s is None and not time_budget,
         "selection_oof_is_post_tuning": True,
-        "tuned_on_full_feature_space": tuned_on_full,
+        # ADR-0102: tuning runs after the FS projection — the legacy disclosure is pinned False
+        # (its semantics, "tuned on full width while shipping a subset", can no longer occur).
+        "tuned_on_full_feature_space": False,
+        "tuned_on": tuned_on,
         "cost_estimate_fits": len(outcomes) * hpo.n_trials * hpo.inner_cv,
         "tuned": {
             name: {
@@ -142,6 +149,29 @@ def _validate_cv_data_floor(cv: CVConfig, ds: Dataset) -> None:
             f"kfold cv needs at least one row per fold ({cv.n_splits} folds > {ds.n_rows} rows); "
             "reduce cv or collect more data"
         )
+
+
+def _warn_degenerate_es_tail(cv: CVConfig, n_rows: int, early_stopping: bool) -> None:
+    """Warn when the time-series es tail is too small to carry a stopping decision (ADR-0080).
+
+    i.i.d./group schemes carve the tail as a fraction, but the time-series schemes take exactly
+    ``cv.n_es`` end rows (default 1): stopping decisions over so few rows are noise, and on the ES
+    path the tree-count ceiling is raised (1000 vs the fixed 300), so a noisy non-stop trains far
+    past need — in the main CV fits AND the HPO inner folds, which share the splitter config.
+    """
+    if not early_stopping or cv.scheme not in ("timeseries", "timeseries_period"):
+        return
+    floor = max(100, -(-n_rows // 200))  # ceil(0.5% of rows)
+    if cv.n_es >= floor:
+        return
+    logger.warning(
+        "cv.n_es=%d row(s) is a degenerate early-stopping tail for %d rows: stopping decisions "
+        "are noise and boosting fits may run to the 1000-tree ES ceiling; set n_es to ~1-5%% of "
+        "the rows (>= %d here)",
+        cv.n_es,
+        n_rows,
+        floor,
+    )
 
 
 def _ensemble_report(outcome: EnsembleOutcome) -> dict[str, Any]:
@@ -318,6 +348,7 @@ class AutoML(BaseEstimator, ClassifierMixin):
         else:
             ds = ds_full
         _validate_cv_data_floor(components.cv, ds)
+        _warn_degenerate_es_tail(components.cv, ds.n_rows, components.early_stopping)
         budget_config = self._resolve_budget(eff["budget"])
         # one cooperative budget shared by HPO and selection (ADR-0062 §5): tuning consumes from the same
         # pool, so a tiny budget cuts trials AND candidates; refit below is never budget-gated.
@@ -335,14 +366,15 @@ class AutoML(BaseEstimator, ClassifierMixin):
                 fs=fs,
             )
         )
-        # M7a HPO stage (ADR-0062 §2/§2b): tune each tunable type on an inner-CV of DEV BEFORE the outer
-        # selection, in BOTH run_modes; the tuned factories are folded into components.estimators.
-        hpo_report = self._run_hpo_stage(
-            ds, task, components, hpo=hpo, fe=fe, fs=fs, budget=budget, ctx=ctx
+        # M7a HPO (ADR-0102, supersedes ADR-0062 §2a): tuning runs INSIDE run_slice after the FS
+        # projection (post-FS objective width), in BOTH run_modes; the tuned factories are folded
+        # back into components.estimators right after run_slice returns.
+        tuning_bundle = self._make_tuning_bundle(
+            task, components, hpo=hpo, fe=fe, budget=budget, ctx=ctx
         )
         # run-fingerprint over the resolved inputs + the DEV data signature (ADR-0035 §2/§3, post-carve);
         # always computed (for the run-report), used as the cache scope only when cache is enabled.
-        run_fingerprint = self._run_fingerprint(ctx.run_config, task, components, ds)
+        run_fingerprint = self._run_fingerprint(ctx.run_config, task, components, ds, hpo=hpo)
         cache = self._build_cache(run_fingerprint)
         with ctx.timed_stage("run", "selection"):
             result = run_slice(
@@ -377,9 +409,22 @@ class AutoML(BaseEstimator, ClassifierMixin):
                     if components.feature_selection is not None
                     else None
                 ),
+                tuning=tuning_bundle,
                 budget=budget,
                 cache=cache,
                 ctx=ctx,
+            )
+        # fold the tuned factories into components.estimators BEFORE ensemble/ship/finalize — the
+        # refits pull from this mapping, so skipping this would ship an UNTUNED winner (ADR-0102).
+        hpo_report: dict[str, Any] | None = None
+        if tuning_bundle is not None and hpo is not None:
+            outcomes = result.hpo or {}
+            components.estimators.update(tuning_bundle.tuned_factories(outcomes))
+            hpo_report = _hpo_report(
+                hpo,
+                outcomes,
+                tuned_on="fs_subset" if result.feature_selection is not None else "dev_full",
+                time_budget=budget is not None and budget.mode == "time",
             )
         # cache observability (F4.7): a cold run next to other fingerprint directories means the
         # resolved config or the data signature changed — name the fingerprint so the user can
@@ -552,58 +597,66 @@ class AutoML(BaseEstimator, ClassifierMixin):
 
     # -- internals ----------------------------------------------------------
 
-    def _run_hpo_stage(
+    def _make_tuning_bundle(
         self,
-        ds: Dataset,
         task: Task,
         components: Components,
         *,
         hpo: HPOConfig | None,
         fe: FEConfig,
-        fs: FeatureSelectionConfig | None,
         budget: RunBudget | None,
         ctx: RunContext,
-    ) -> dict[str, Any] | None:
-        """Tune each tunable model on an inner-CV of DEV and fold the tuned factories into components.
+    ) -> TuningBundle | None:
+        """Compose the HPO closures ``run_slice`` invokes after its FS projection (ADR-0102).
 
-        Runs in BOTH run_modes (selection's leaderboard must reflect the same tuned candidates the full
-        mode would ship, ADR-0038 §2b). Returns the additive hpo run-report block; None when HPO is off.
+        No tuning runs here — the bundle closes over the resolved components and executes inside
+        the slice, in BOTH run_modes (selection's leaderboard must reflect the same tuned candidates
+        the full mode would ship, ADR-0038 §2b). ``None`` when HPO is off.
         """
         if hpo is None or components.tuner is None:
             return None
         assert components.make_factory is not None and components.inner_splitter is not None
-        with ctx.timed_stage("run", "hpo"):
-            outcomes = tune_estimators(
-                ds,
-                task,
-                tunable=components.tunable or {},
-                make_factory=components.make_factory,
-                tuner=components.tuner,
-                metric=components.metric,
-                policy=components.policy,
-                inner_splitter=components.inner_splitter,
-                n_trials=hpo.n_trials,
-                timeout_s=hpo.timeout_s,
-                # _resolve_hpo already filled None -> seed; keep an explicit check (not `or`, falsy for 0)
-                random_state=hpo.random_state
-                if hpo.random_state is not None
-                else self.random_state,
-                fe=fe,
-                sample_weight=ds.sample_weight(),
-                budget=budget,
-                ctx=ctx,
-            )
-        for name, outcome in outcomes.items():
-            tuned = components.make_factory(name, outcome.best_params)
-            components.estimators[f"{name}__tuned" if hpo.keep_baseline else name] = tuned
-        # a time budget imposes a finite Optuna timeout (fair-share, _timeout) -> non-deterministic
-        # even when hpo.timeout_s is None; mirror that exact condition in the honesty flag (ADR-0062 §7)
-        return _hpo_report(
-            hpo,
-            outcomes,
-            tuned_on_full=fs is not None,
-            time_budget=budget is not None and budget.mode == "time",
-        )
+        make_factory = components.make_factory
+        tuner = components.tuner
+        inner_splitter = components.inner_splitter
+
+        def tune(
+            ds_dev: Dataset, selected: tuple[str, ...] | None
+        ) -> dict[str, TuneOutcome]:
+            with ctx.timed_stage("run", "hpo"):
+                return tune_estimators(
+                    ds_dev,
+                    task,
+                    tunable=components.tunable or {},
+                    make_factory=make_factory,
+                    tuner=tuner,
+                    metric=components.metric,
+                    policy=components.policy,
+                    inner_splitter=inner_splitter,
+                    n_trials=hpo.n_trials,
+                    timeout_s=hpo.timeout_s,
+                    # _resolve_hpo already filled None -> seed; explicit check (not `or`, falsy for 0)
+                    random_state=hpo.random_state
+                    if hpo.random_state is not None
+                    else self.random_state,
+                    fe=fe,
+                    sample_weight=ds_dev.sample_weight(),
+                    budget=budget,
+                    ctx=ctx,
+                    selected_features=selected,
+                )
+
+        def tuned_factories(
+            outcomes: dict[str, TuneOutcome],
+        ) -> dict[str, EstimatorFactory]:
+            return {
+                (f"{name}__tuned" if hpo.keep_baseline else name): make_factory(
+                    name, o.best_params
+                )
+                for name, o in outcomes.items()
+            }
+
+        return TuningBundle(tune=tune, tuned_factories=tuned_factories)
 
     def _run_ensemble_stage(
         self,
@@ -883,7 +936,13 @@ class AutoML(BaseEstimator, ClassifierMixin):
         return RunBudget(config)
 
     def _run_fingerprint(
-        self, run_config: RunConfig, task: Task, components: Components, ds: Dataset
+        self,
+        run_config: RunConfig,
+        task: Task,
+        components: Components,
+        ds: Dataset,
+        *,
+        hpo: HPOConfig | None = None,
     ) -> str:
         """Assemble the run-fingerprint over the resolved inputs + DEV signature.
 
@@ -898,6 +957,11 @@ class AutoML(BaseEstimator, ClassifierMixin):
         )
 
         estimators = tuple(components.estimators)
+        # predictable pre-tuning candidate ids (ADR-0102): tuning now runs inside run_slice, so the
+        # `__tuned` names are derived from config intent (the tunable set), not from which searches
+        # actually completed; keep_baseline=False replaces names in place -> composition unchanged.
+        if hpo is not None and hpo.keep_baseline and components.tunable:
+            estimators = estimators + tuple(f"{n}__tuned" for n in components.tunable)
         return compute_run_fingerprint(
             run_config=run_config,
             task=task,

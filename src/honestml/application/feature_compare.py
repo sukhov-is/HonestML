@@ -35,7 +35,13 @@ from honestml.core.selection_policy import (
     equivalence_band,
 )
 
-from .feature_selection import _degenerate_counts, estimate_fs_refits, select_features
+from .feature_selection import (
+    _degenerate_counts,
+    aggregate_scores,
+    apply_cutoff,
+    estimate_fs_refits,
+    refine_trajectory,
+)
 from .oof_scorer import (
     FitPredict,
     _fold_proba,
@@ -79,8 +85,12 @@ class CompareOutcome:
     per_fold_block_stats: dict[str, float] | None = None
     # in-sequential band observability (ADR-0086 §1): the wrapper-selector band of the WINNER strategy,
     # SEPARATE from the strategy-arbitration band (winner_rule/band_members). None unless the winner is a
-    # wrapper selector with significance on. Keys: width, winner_by_tiebreak, members, rule.
+    # wrapper selector with significance on. Keys: width, winner_by_tiebreak, members, rule. The cascade's
+    # refinement band (ADR-0100) rides the same channel.
     seq_band: dict[str, object] | None = None
+    # cascade refinement observability (ADR-0100): the WINNER strategy's stage sizes, None when the
+    # refinement stage did not run. Keys: n_after_rank, n_after_refine, trajectory_len, capped.
+    refine: dict[str, object] | None = None
 
 
 def _strategy_seed(name: str, random_state: int) -> int:
@@ -306,13 +316,16 @@ def _select_one(
     groups: np.ndarray | None = None,
     significance_test: SignificanceTest | None = None,
     policy: SelectionPolicy | None = None,
-) -> tuple[tuple[int, ...], BandResult | None]:
-    """Run one strategy, dispatching by port; a wrapper selector gets the significance band (ADR-0083).
+) -> tuple[tuple[int, ...], BandResult | None, dict[str, object] | None]:
+    """Run one strategy, dispatching by port -> ``(subset, band, refine_meta)`` (ADR-0083/0100).
 
-    ranker spine -> ``(subset, None)``; wrapper selector -> greedy trajectory scored Same-OOF, band + Occam
-    pick the final subset, returning its :class:`BandResult` for observability. ``groups`` (M6d) is the
-    per-row structure label (``block_index`` for the band; structure-aware rankers); already sliced to
-    ``x``'s rows by the caller (ADR-0050 §3).
+    Wrapper selector: greedy trajectory scored Same-OOF, band + Occam pick the final subset
+    (``refine_meta`` is None — the wrapper is its own descent). Ranker spine: the two-stage cascade
+    (ADR-0100) — rank ONCE, cut, then descend the survivors in stage-1 importance order and let the
+    band pick the most compact indistinguishable point; ``refine=False`` (or a cut already at the
+    floor) keeps the single-cut path and returns ``(subset, None, None)``. ``groups`` (M6d) is the
+    per-row structure label (``block_index`` for the band; structure-aware rankers); already sliced
+    to ``x``'s rows by the caller (ADR-0050 §3).
     """
     if isinstance(strategy, FeatureSubsetSelector):
         score_subset = make_oof_scorer(
@@ -335,7 +348,7 @@ def _select_one(
             random_state=seed,
             sample_weight=sample_weight,
         )
-        return _band_over_trajectory(
+        subset, band = _band_over_trajectory(
             trajectory,
             x,
             y,
@@ -350,20 +363,52 @@ def _select_one(
             significance_test=significance_test,
             policy=policy,
         )
+        return subset, band, None
     seeded = config.model_copy(update={"random_state": seed})
-    return (
-        select_features(
-            x,
-            y,
-            list(folds),
-            ranker=strategy,
-            categorical=categorical,
-            config=seeded,
-            sample_weight=sample_weight,
-            groups=groups,
-        ),
-        None,
+    agg = aggregate_scores(
+        x,
+        y,
+        list(folds),
+        ranker=strategy,
+        categorical=categorical,
+        config=seeded,
+        sample_weight=sample_weight,
+        groups=groups,
     )
+    subset1 = apply_cutoff(agg, seeded, strategy.auto_threshold(x.shape[1]))
+    floor = max(1, config.seq_min_features)
+    if not config.refine or len(subset1) <= floor:
+        return subset1, None, None
+    trajectory = refine_trajectory(
+        subset1,
+        agg,
+        max_features=config.refine_max_features,
+        drop_frac=config.refine_drop_frac,
+        min_features=floor,
+    )
+    subset2, band = _band_over_trajectory(
+        trajectory,
+        x,
+        y,
+        folds,
+        fit_predict=fit_predict,
+        metric=metric,
+        task=task,
+        random_state=seed,
+        sample_weight=sample_weight,
+        global_classes=global_classes,
+        groups=groups,
+        significance_test=significance_test,
+        policy=policy,
+    )
+    meta: dict[str, object] = {
+        "n_after_rank": len(subset1),
+        "n_after_refine": len(subset2),
+        "trajectory_len": len(trajectory),
+        "capped": config.refine_max_features is not None
+        and len(subset1) > config.refine_max_features,
+    }
+    return subset2, band, meta
 
 
 def _nested_winner(
@@ -542,7 +587,8 @@ def _score_procedure(
             fold_n_blocks.append(float(n_blk))
         seed_f = _strategy_fold_seed(name, random_state, fold_id)
         inner = list(inner_splitter.split(dataset.take(tr)))  # type: ignore[attr-defined]
-        idx_f, _ = _select_one(
+        # per-fold band/refine meta are discarded like the per-fold BandResult below (ADR-0086 §1)
+        idx_f, _, _ = _select_one(
             strategy,
             x_full[tr],
             y[tr],
@@ -729,8 +775,8 @@ class _CompareCtx:
         sw: np.ndarray | None,
         seed: int,
         grp: np.ndarray | None,
-    ) -> tuple[tuple[int, ...], BandResult | None]:
-        """Run one strategy -> ``(subset, BandResult|None)``; map non-:class:`FeatureSelectionError` to fail-fast (ADR-0048 §4)."""
+    ) -> tuple[tuple[int, ...], BandResult | None, dict[str, object] | None]:
+        """Run one strategy -> ``(subset, band, refine_meta)``; map non-:class:`FeatureSelectionError` to fail-fast (ADR-0048 §4)."""
         try:
             return _select_one(
                 strat,
@@ -781,6 +827,7 @@ def _outcome(
     per_strategy_mean_features: tuple[tuple[str, float], ...] = (),
     per_fold_block_stats: dict[str, float] | None = None,
     seq_band: BandResult | None = None,
+    refine: dict[str, object] | None = None,
 ) -> CompareOutcome:
     """The single :class:`CompareOutcome` constructor — resolves ``winner_subset`` once for every mode."""
     return CompareOutcome(
@@ -796,6 +843,7 @@ def _outcome(
         per_strategy_mean_features=per_strategy_mean_features,
         per_fold_block_stats=per_fold_block_stats,
         seq_band=_seq_band_dict(seq_band),
+        refine=refine,
     )
 
 
@@ -808,7 +856,7 @@ def _compare_single(
     """Select the first strategy on full DEV — no carve/arbitration (single-strategy or degraded path)."""
     name, strat = strategies[0]
     folds = list(ctx.splitter.split(ctx.dataset))  # type: ignore[attr-defined]
-    idx, band = ctx.select(
+    idx, band, refine_meta = ctx.select(
         name, strat, ctx.x_full, ctx.y, folds, ctx.sample_weight, ctx.random_state, ctx.groups
     )
     return _outcome(
@@ -818,6 +866,7 @@ def _compare_single(
         ((name, len(idx), float("nan")),),
         arbitration_effective=arbitration_effective,
         seq_band=band,
+        refine=refine_meta,
     )
 
 
@@ -873,7 +922,7 @@ def _compare_per_fold(
         return None
     winner, pf_per_strategy, pf_per_mean, pf_rule, pf_band, jaccard, degraded, pf_block = pf
     sel_folds = list(ctx.splitter.split(ctx.dataset))  # type: ignore[attr-defined]
-    winner_idx, winner_band = ctx.select(
+    winner_idx, winner_band, winner_refine = ctx.select(
         winner,
         dict(strategies)[winner],
         ctx.x_full,
@@ -891,6 +940,7 @@ def _compare_per_fold(
         winner_rule=pf_rule,
         band_members=pf_band,
         seq_band=winner_band,
+        refine=winner_refine,
         arbitration_effective="per_fold_partial_c5_inner" if degraded else "nested_per_fold",
         fold_subset_jaccard=jaccard,
         per_strategy_mean_features=tuple(pf_per_mean),
@@ -931,8 +981,9 @@ def _compare_nested(
         )
         for name, strat in strategies
     }
-    subsets = [(name, sub) for name, (sub, _band) in selected.items()]
-    seq_bands = {name: band for name, (_sub, band) in selected.items()}
+    subsets = [(name, sub) for name, (sub, _band, _meta) in selected.items()]
+    seq_bands = {name: band for name, (_sub, band, _meta) in selected.items()}
+    refine_by_name = {name: meta for name, (_sub, _band, meta) in selected.items()}
     arb_folds = list(arbitration_splitter.split(ctx.dataset))  # type: ignore[attr-defined]
     n_winner, n_winner_idx, n_per_strategy, n_per_std, n_rule, n_band = _nested_winner(
         subsets,
@@ -959,6 +1010,7 @@ def _compare_nested(
         per_strategy_std=tuple(n_per_std),
         arbitration_effective="nested",
         seq_band=seq_bands.get(n_winner),
+        refine=refine_by_name.get(n_winner),
     )
 
 
@@ -1011,13 +1063,14 @@ def _compare_holdout(
         )
         for name, strat in strategies
     }
-    seq_bands = {name: band for name, (_sub, band) in selected.items()}
+    seq_bands = {name: band for name, (_sub, band, _meta) in selected.items()}
+    refine_by_name = {name: meta for name, (_sub, _band, meta) in selected.items()}
 
     per_strategy: list[tuple[str, int, float]] = []
     best_name: str = ""
     best_idx: tuple[int, ...] = ()
     best_score = -np.inf
-    for name, (idx, _band) in selected.items():
+    for name, (idx, _band, _meta) in selected.items():
         arb = _arbitrate_score(
             x_devfit,
             y_devfit,
@@ -1042,6 +1095,7 @@ def _compare_holdout(
         per_strategy,
         arbitration_effective=arbitration_effective,
         seq_band=seq_bands.get(best_name),
+        refine=refine_by_name.get(best_name),
     )
 
 

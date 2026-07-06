@@ -946,8 +946,9 @@ def test_invalid_feature_selection_raises_configerror() -> None:
 
 def test_fs_on_reduces_features_and_predicts() -> None:
     # FR-FS-1/4: selection trims the model-facing features; the winner refits on the subset
+    # (refine=False pins the exact single-cut top_k count — the legacy M6b contract)
     X, y = _data()  # 6 numeric features
-    cfg = FeatureSelectionConfig(cutoff="top_k", top_k=3)
+    cfg = FeatureSelectionConfig(cutoff="top_k", top_k=3, refine=False)
     m = AutoML(task="binary", models=("linear",), random_state=0, feature_selection=cfg).fit(X, y)
     assert m.schema_.selected_features is not None and len(m.schema_.selected_features) == 3
     assert m.leaderboard_[0].n_features == 3
@@ -959,6 +960,21 @@ def test_fs_on_reduces_features_and_predicts() -> None:
         "no_selection_better",
         "all_features_selected",
     }
+
+
+def test_fs_default_cascade_refines_and_reports() -> None:
+    # ADR-0100: the default refine=True runs the cascade on a single ranker strategy — the run
+    # report carries the refine block and the subset never exceeds the stage-1 cut
+    X, y = _data()  # 6 numeric features
+    cfg = FeatureSelectionConfig(strategy="importance")  # top_frac=0.5 -> stage-1 keeps 3
+    m = AutoML(task="binary", models=("linear",), random_state=0, feature_selection=cfg).fit(X, y)
+    fs = m.run_report_["feature_selection"]
+    assert m.schema_.selected_features is not None
+    refine = fs["refine"]
+    assert refine["n_after_rank"] == 3
+    assert fs["n_selected"] == refine["n_after_refine"] <= 3
+    assert refine["trajectory_len"] >= 2 and refine["capped"] is False
+    assert m.predict(X).shape[0] == len(y)
 
 
 def test_fs_changes_run_fingerprint() -> None:
@@ -995,6 +1011,40 @@ def test_fe_on_fs_on_roundtrip() -> None:
     ).fit(df, y)
     assert m.schema_.selected_features is not None
     assert m.predict(df).shape[0] == len(y)
+
+
+def test_degenerate_es_tail_warning(caplog) -> None:
+    # time-series schemes take exactly n_es end rows as the ES validation set (default 1 row):
+    # the degeneracy must be loud, and silent when the tail is healthy / ES off / i.i.d. scheme
+    from honestml.composition.facade import _warn_degenerate_es_tail
+
+    cv_ts = CVConfig(scheme="timeseries", n_splits=2)  # n_es default = 1 row
+    with caplog.at_level(logging.WARNING):
+        _warn_degenerate_es_tail(cv_ts, 100_000, True)
+    assert any("degenerate early-stopping tail" in r.message for r in caplog.records)
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        _warn_degenerate_es_tail(CVConfig(scheme="timeseries", n_es=5_000), 100_000, True)
+        _warn_degenerate_es_tail(cv_ts, 100_000, False)  # no boosting in the zoo
+        _warn_degenerate_es_tail(CVConfig(scheme="kfold"), 100_000, True)  # es_fraction path
+    assert not caplog.records
+
+
+def test_fs_on_nan_data_selects_and_predicts() -> None:
+    # NaN-safe FS: one fit exercises the rankers, the sequential score_subset scorer, the holdout
+    # arbitration and the no-selection gate on NaN-containing numerics (median impute from train stats)
+    X, y = _data()
+    X = X.copy()
+    X[np.random.default_rng(0).random(X.shape) < 0.15] = np.nan
+    cfg = FeatureSelectionConfig(compare=("importance", "sequential"), selection_holdout=0.3)
+    m = AutoML(task="binary", models=("linear",), random_state=0, feature_selection=cfg).fit(X, y)
+    assert m.schema_.selected_features is not None
+    assert m.predict(X).shape[0] == len(y)
+    assert m.run_report_["feature_selection"]["no_selection_gate"] in {
+        "selection_kept",
+        "no_selection_better",
+        "all_features_selected",
+    }
 
 
 # --- M6c honest-compare (ADR-0046/0048/0049) ---

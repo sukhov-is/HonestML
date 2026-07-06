@@ -252,6 +252,9 @@ def _feature_selection_report(
             )
         if fs.fold_subset_jaccard is not None:
             block["fold_subset_jaccard"] = fs.fold_subset_jaccard
+    # cascade refinement stage sizes of the winner (ADR-0100): present only when refinement ran.
+    if fs.refine is not None:
+        block["refine"] = fs.refine
     # M6d structure-aware null diagnostics (ADR-0050 §5): block stats for ts/group null_importance. M6f
     # (ADR-0059) adds per-fold degenerate aggregates here (merged into null_block_stats in run_slice).
     if fs.null_block_stats is not None:

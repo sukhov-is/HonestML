@@ -100,10 +100,17 @@ class BootstrapSignificanceTest:
             # exclude uncovered rows (id -1); mirrors _period_block_deltas so a stray -1 never forms a block
             blocks = [np.flatnonzero(block_index == b) for b in np.unique(block_index) if b >= 0]
             n_blocks = len(blocks)
+            # with few CV folds there are only n_blocks**n_blocks distinct ORDERED draws, so most of the
+            # n_boot resamples repeat — memoize on the ordered draw (order preserved: sorting would change
+            # row concatenation and hence ULP-level metric values). RNG sequence unchanged -> byte-identical.
+            seen: dict[bytes, float] = {}
             for i in range(self.n_boot):
                 chosen = rng.integers(0, n_blocks, size=n_blocks)
-                idx = np.concatenate([blocks[j] for j in chosen])
-                deltas[i] = self._delta(idx, pred_a, pred_b, y_true, sample_weight)
+                key = chosen.tobytes()
+                if key not in seen:
+                    idx = np.concatenate([blocks[j] for j in chosen])
+                    seen[key] = self._delta(idx, pred_a, pred_b, y_true, sample_weight)
+                deltas[i] = seen[key]
         return deltas
 
     def _period_delta_distribution(

@@ -5,9 +5,11 @@ search it; the tuned factory then competes in the outer honest selection (``run_
 (ADR-0062 §2/§3). The objective REUSES ``run_slice``'s per-fold engine (:func:`_run_candidate`) plus a
 SEPARATE out-of-fold target-encoding step (:func:`_augment_oof_te` on an INNER fold index) — because
 ``_run_candidate`` alone does no TE and the full-train TE would leak the target into the search
-(ADR-0062 §2, R2 fix). It does NOT touch the feature-selection block: the inner objective sees the full
-DEV feature width (ADR-0062 §2a). ``sample_weight`` weights inner fit AND inner score, matching the
-weighted leaderboard. Budget is cooperative with graceful degradation (best-so-far / baseline, §5).
+(ADR-0062 §2, R2 fix). With ``selected_features`` set (the post-FS subset, ADR-0102 superseding
+ADR-0062 §2a) the objective is projected to that width AFTER the TE step — the TE positional lookups
+assume the full matrix; ``None`` keeps the legacy full-DEV-width objective statement-for-statement.
+``sample_weight`` weights inner fit AND inner score, matching the weighted leaderboard. Budget is
+cooperative with graceful degradation (best-so-far / baseline, §5).
 """
 
 from __future__ import annotations
@@ -77,6 +79,7 @@ def tune_estimators(
     sample_weight: np.ndarray | None = None,
     budget: Budget | None = None,
     ctx: RunContext | None = None,
+    selected_features: tuple[str, ...] | None = None,
 ) -> dict[str, TuneOutcome]:
     """Tune each model type on an inner-CV of DEV; return ``name -> TuneOutcome`` (ADR-0062 §2)."""
     logger = ctx.logger if ctx is not None else get_logger()
@@ -87,13 +90,13 @@ def tune_estimators(
     classes = np.unique(y)
     positive = resolve_positive(task, classes) if task.kind == "binary" else None
 
-    # full DEV feature space (NO FS projection — the inner objective sees full width, ADR-0062 §2a)
+    # full DEV feature space; the post-FS projection (ADR-0102) happens AFTER the TE step below
     x_full = design_matrix(ds_dev)
     feature_names = list(schema.features)
     n_features = len(feature_names)
-    # native-categorical routing (ADR-0088/0092, FR-1/FR-2): the inner objective sees full width (no FS),
-    # so the cardinality-GATED CATEGORICAL-column positions are taken over the full feature list via the
-    # same gate run_slice/refit_best use (cap from the task), keeping CV/refit/HPO routing identical (R-3).
+    # native-categorical routing (ADR-0088/0092, FR-1/FR-2): the cardinality-GATED CATEGORICAL-column
+    # positions are taken over the full feature list via the same gate run_slice/refit_best use (cap
+    # from the task), keeping CV/refit/HPO routing identical (R-3); recomputed after any projection.
     categorical_indices = categorical_positions(
         feature_names, native_routable(schema, task.native_cat_max_unique)
     )
@@ -116,6 +119,19 @@ def tune_estimators(
             fe.te_smoothing,
             feature_names,
             time_ordered=isinstance(inner_splitter, TimeOrderedSplitter),
+        )
+
+    # post-FS projection (ADR-0102): strictly AFTER the TE step (its positional lookups assume the
+    # full-width matrix) and by NAME in schema.features order — the same rule design_matrix applies —
+    # with the routing indices recomputed by the same gate, so CV/refit/HPO routing stays identical (R-3).
+    if selected_features is not None:
+        selected_set = set(selected_features)
+        keep = [i for i, f in enumerate(feature_names) if f in selected_set]
+        x_eval = x_eval[:, keep]
+        feature_names = [feature_names[i] for i in keep]
+        n_features = len(feature_names)
+        categorical_indices = categorical_positions(
+            feature_names, native_routable(schema, task.native_cat_max_unique)
         )
 
     need_proba = metric.needs in _PROBA_NEEDS

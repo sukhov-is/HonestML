@@ -169,9 +169,9 @@ X, y = make_classification(n_samples=150, n_features=6, n_informative=4, random_
 rng = np.random.default_rng(0)
 X[rng.random(X.shape) < 0.1] = np.nan  # 10% missing values
 
-model = AutoML(task="binary", cv=3, random_state=0).fit(X, y)  # models=None: every installed model
+model = AutoML(task="binary", cv=3, random_state=0).fit(X, y)  # models=None: every installed default model
 
-print(sorted(e.model_id for e in model.leaderboard_))  # all installed models rank: linear/baseline impute, boosting splits on NaN
+print(sorted(e.model_id for e in model.leaderboard_))  # installed default models rank: linear/baseline impute, boosting splits on NaN
 print(model.best_model_id_)
 ```
 

@@ -124,6 +124,15 @@ def test_linear_regressor_learns_signal() -> None:
     assert err < 0.5 * base
 
 
+def test_baseline_ignores_x_and_matches_prior() -> None:
+    # the baseline bypasses X entirely (constant stand-in, no imputer pass over the full matrix);
+    # prior probabilities depend only on y — pin them to the exact class frequencies
+    X, y = _xy_binary(n=80)
+    proba = BaselineClassifier().fit(X, y).predict_proba(X)
+    prior = np.bincount(y) / len(y)
+    assert np.array_equal(proba, np.tile(prior, (len(y), 1)))
+
+
 @pytest.mark.parametrize("factory", _CLASSIFIERS + _REGRESSORS)
 def test_estimators_handle_nan_via_imputer(factory) -> None:
     # ADR-0078: a median SimpleImputer prefixes the Pipeline, so raw NaN no longer crashes the fit.

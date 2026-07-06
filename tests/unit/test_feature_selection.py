@@ -13,7 +13,9 @@ from honestml.application import apply_cutoff, design_matrix, select_features
 from honestml.application.feature_selection import (
     _degenerate_counts,
     _normalize_fold,
+    aggregate_scores,
     estimate_fs_refits,
+    refine_trajectory,
     structure_labels,
 )
 from honestml.core import ColumnRole, FeatureSchema, Fold
@@ -230,13 +232,69 @@ def test_degenerate_count_vectorized_equals_reference() -> None:
     )  # 6 one-row blocks all degenerate
 
 
+# --- cascade refinement trajectory (ADR-0100) ---
+
+
+def test_refine_trajectory_shape_and_order() -> None:
+    # agg descending: 9,8,...,0 -> survivors {0..9}; cap 6; drop 25% per step; floor 2
+    agg = np.arange(10, dtype=float)  # column 9 strongest
+    subset = tuple(range(10))
+    traj = refine_trajectory(subset, agg, max_features=6, drop_frac=0.25, min_features=2)
+    assert traj[0] == subset  # uncapped survivor set anchors the band
+    assert traj[1] == (4, 5, 6, 7, 8, 9)  # capped top-6 by agg
+    sizes = [len(t) for t in traj]
+    assert sizes == sorted(sizes, reverse=True) and len(set(sizes)) == len(sizes)  # strictly dec
+    assert sizes[-1] == 2  # floor reached exactly (drop clamped, never overshoots)
+    assert all(t == tuple(sorted(t)) for t in traj)  # column-position order (FR-FS-7)
+    # each step drops the weakest tail of the current subset
+    assert traj[2] == (6, 7, 8, 9)  # ceil(6*0.25)=2 dropped: columns 4,5 (weakest)
+    # deterministic
+    assert traj == refine_trajectory(subset, agg, max_features=6, drop_frac=0.25, min_features=2)
+
+
+def test_refine_trajectory_no_cap_and_tiny_subset() -> None:
+    agg = np.array([0.4, 0.1, 0.3, 0.2])
+    traj = refine_trajectory((0, 1, 2, 3), agg, max_features=None, drop_frac=0.5, min_features=1)
+    assert traj[0] == (0, 1, 2, 3)
+    assert traj[1] == (0, 2)  # ceil(4*0.5)=2 weakest dropped (cols 1,3)
+    assert traj[-1] == (0,)
+    # subset at the floor -> single-point trajectory (the caller skips refinement anyway)
+    assert refine_trajectory((2,), agg, max_features=None, drop_frac=0.5, min_features=1) == ((2,),)
+
+
+def test_refine_trajectory_tie_order_matches_apply_cutoff() -> None:
+    # equal scores: stable argsort ties toward the LOWER column index being stronger, exactly
+    # like apply_cutoff's order (parity keeps the cascade cut and descent consistent)
+    agg = np.array([0.5, 0.5, 0.5, 0.5])
+    traj = refine_trajectory((0, 1, 2, 3), agg, max_features=2, drop_frac=0.5, min_features=1)
+    assert traj[1] == (0, 1)  # top-2 under stable ties
+
+
+def test_select_features_equals_aggregate_plus_cutoff() -> None:
+    # refactor safety: select_features (M6b path) == apply_cutoff(aggregate_scores(...)) byte-for-byte
+    x = np.column_stack([np.arange(30, dtype=float), np.ones(30), -np.arange(30, dtype=float)])
+    y = (np.arange(30) % 2).astype(int)
+    folds = _folds(30)
+    ranker = _FixedRanker(np.array([0.7, 0.1, 0.2]), scales=[1.0])
+    cfg = FeatureSelectionConfig(cutoff="top_k", top_k=2, refine=False, random_state=0)
+    direct = select_features(
+        x, y, folds, ranker=ranker, categorical=np.zeros(3, dtype=bool), config=cfg
+    )
+    agg = aggregate_scores(
+        x, y, folds, ranker=ranker, categorical=np.zeros(3, dtype=bool), config=cfg
+    )
+    assert direct == apply_cutoff(agg, cfg, ranker.auto_threshold(3))
+
+
 def test_estimate_fs_refits_matches_compare_formula() -> None:
-    # per_fold == runtime compare formula (feature_compare:617-622): n_strat × K_outer × inner × per_fit
+    # per_fold == runtime compare formula (feature_compare:617-622): n_strat × K_outer × inner × per_fit;
+    # refine=False reproduces the pre-cascade numbers exactly (ADR-0100 back-compat)
     fs = FeatureSelectionConfig(
         compare=("importance", "null_importance"),
         arbitration="nested_per_fold",
         arbitration_n_splits=4,
         n_runs=10,
+        refine=False,
     )
     per_fit = 1 + fs.n_runs
     assert (
@@ -244,14 +302,42 @@ def test_estimate_fs_refits_matches_compare_formula() -> None:
         == 2 * 4 * 5 * per_fit
     )
     # holdout: no outer factor -> n_strat × inner × per_fit
-    fs_h = FeatureSelectionConfig(compare=("importance", "null_importance"), n_runs=10)
+    fs_h = FeatureSelectionConfig(
+        compare=("importance", "null_importance"), n_runs=10, refine=False
+    )
     assert estimate_fs_refits(fs_h, n_strategies=2, n_features=8, inner_n_splits=5) == 2 * 5 * (
         1 + 10
     )
-    # sequential -> n_features² upper bound (no runtime reference; excluded from byte-identity, ADR-0058 §1)
+    # sequential -> n_features² upper bound (no runtime reference; excluded from byte-identity, ADR-0058 §1);
+    # the wrapper is unaffected by the refine default (its own descent)
     fs_s = FeatureSelectionConfig(strategy="sequential")
     assert (
         estimate_fs_refits(fs_s, n_strategies=1, n_features=6, inner_n_splits=5) == 1 * (6 * 6) * 5
+    )
+
+
+def test_estimate_fs_refits_adds_refine_trajectory_bound() -> None:
+    # ADR-0100: a ranker strategy with refine adds the deterministic trajectory-length bound to base.
+    # cutoff='auto' has no a-priori bound below n -> k0=n; verify against refine_trajectory's actual
+    # length from a full survivor set (the estimator mirrors it step-for-step).
+    n = 12
+    fs = FeatureSelectionConfig(
+        strategy="importance", cutoff="auto", refine_max_features=8, refine_drop_frac=0.25
+    )
+    traj = refine_trajectory(
+        tuple(range(n)), np.arange(n, dtype=float), max_features=8, drop_frac=0.25, min_features=1
+    )
+    expected_base = 1 + len(traj)  # 1 ranker fit + one OOF eval per visited subset
+    assert (
+        estimate_fs_refits(fs, n_strategies=1, n_features=n, inner_n_splits=3) == expected_base * 3
+    )
+    # top_k bounds the survivor count below the cap -> no cap point in the bound
+    fs_k = FeatureSelectionConfig(strategy="importance", cutoff="top_k", top_k=4)
+    traj_k = refine_trajectory(
+        tuple(range(4)), np.arange(4, dtype=float), max_features=200, drop_frac=0.05, min_features=1
+    )
+    assert estimate_fs_refits(fs_k, n_strategies=1, n_features=n, inner_n_splits=3) == (
+        (1 + len(traj_k)) * 3
     )
 
 

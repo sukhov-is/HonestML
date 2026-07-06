@@ -40,32 +40,54 @@ def test_feature_ranker_off_by_default() -> None:
 
 
 def test_feature_ranker_resolved_by_strategy() -> None:
+    # refine=False pins the legacy M6b single-ranker path bit-exactly (ADR-0100 back-compat)
     from honestml.adapters import ImportanceRanker, RandomProbeRanker
     from honestml.core import FeatureSelectionConfig
 
     imp = build_default_components(
         Task(kind="binary"),
         random_state=0,
-        feature_selection=FeatureSelectionConfig(strategy="importance"),
+        feature_selection=FeatureSelectionConfig(strategy="importance", refine=False),
     )
     assert isinstance(imp.feature_ranker, ImportanceRanker)
     probe = build_default_components(
         Task(kind="binary"),
         random_state=0,
-        feature_selection=FeatureSelectionConfig(strategy="random_probe"),
+        feature_selection=FeatureSelectionConfig(strategy="random_probe", refine=False),
     )
     assert isinstance(probe.feature_ranker, RandomProbeRanker)
 
 
+def test_single_ranker_with_refine_routes_via_compare_path() -> None:
+    # ADR-0100: the default refine=True re-routes a single ranker strategy through the compare
+    # machinery (cascade in _select_one); the carve is wired but unused in single mode
+    from honestml.adapters import ImportanceRanker
+    from honestml.core import FeatureSelectionConfig
+
+    comp = build_default_components(
+        Task(kind="binary"),
+        random_state=0,
+        feature_selection=FeatureSelectionConfig(strategy="importance"),
+    )
+    assert comp.feature_ranker is None
+    assert comp.feature_strategies is not None
+    assert [n for n, _ in comp.feature_strategies] == ["importance"]
+    assert isinstance(comp.feature_strategies[0][1], ImportanceRanker)
+    assert comp.feature_fit_predict is not None
+
+
 def test_null_importance_single_uses_m6b_ranker_path() -> None:
-    # null_importance is a ranker -> single-strategy stays the M6b feature_ranker path (no compare wiring)
+    # null_importance is a ranker -> with refine=False the single strategy stays the M6b
+    # feature_ranker path (no compare wiring)
     from honestml.adapters import NullImportanceRanker
     from honestml.core import FeatureSelectionConfig
 
     c = build_default_components(
         Task(kind="binary"),
         random_state=0,
-        feature_selection=FeatureSelectionConfig(strategy="null_importance", n_runs=10),
+        feature_selection=FeatureSelectionConfig(
+            strategy="null_importance", n_runs=10, refine=False
+        ),
     )
     assert isinstance(c.feature_ranker, NullImportanceRanker)
     assert c.feature_strategies is None
@@ -107,6 +129,25 @@ def test_null_importance_resolves_for_timeseries_and_group() -> None:
         )
         assert comp.feature_strategies is not None
         assert "null_importance" in {name for name, _ in comp.feature_strategies}
+
+
+def test_calibrate_on_timeseries_warns_at_composition(caplog) -> None:
+    # dead-config loudness: the TS cross-fit calibration gate never runs (looks ahead), and the
+    # ship-time skip fires only after training — composition must warn BEFORE any fit
+    with caplog.at_level(logging.WARNING):
+        build_default_components(
+            Task(kind="binary"),
+            random_state=0,
+            cv=CVConfig(scheme="timeseries", calibrate="auto"),
+            has_time=True,
+        )
+    assert any("has no effect on a time-series scheme" in r.message for r in caplog.records)
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        build_default_components(
+            Task(kind="binary"), random_state=0, cv=CVConfig(scheme="timeseries"), has_time=True
+        )
+    assert not any("has no effect on a time-series scheme" in r.message for r in caplog.records)
 
 
 def test_nested_arbitration_resolves_splitter_with_compare() -> None:
@@ -186,6 +227,28 @@ def test_per_fold_arbitration_resolves_splitter_and_warns_cost(caplog) -> None:
     assert any(
         "nested_per_fold" in r.message and "SELECTION cost" in r.message for r in caplog.records
     )
+
+
+def test_explicit_refine_on_pure_sequential_warns_dead_config(caplog) -> None:
+    # ADR-0100: refine acts on ranker strategies only; explicit refine=True with the pure
+    # sequential wrapper is dead config -> WARNING (the default True must not error there)
+    from honestml.core import FeatureSelectionConfig
+
+    with caplog.at_level("WARNING"):
+        build_default_components(
+            Task(kind="binary"),
+            random_state=0,
+            feature_selection=FeatureSelectionConfig(strategy="sequential", refine=True),
+        )
+    assert any("refine=True has no effect" in r.message for r in caplog.records)
+    caplog.clear()
+    with caplog.at_level("WARNING"):
+        build_default_components(
+            Task(kind="binary"),
+            random_state=0,
+            feature_selection=FeatureSelectionConfig(strategy="sequential"),  # default, no warning
+        )
+    assert not any("refine=True has no effect" in r.message for r in caplog.records)
 
 
 def test_block_window_at_rank_mode_warns_dead_config(caplog) -> None:
@@ -384,6 +447,17 @@ def test_cost_budget_downgrades_arbitration() -> None:
     )
 
 
+def test_cost_budget_drops_refine_before_floor_failure(caplog) -> None:
+    # ADR-0100 budget rung: refinement is the cheapest honesty to shed before the loud floor error.
+    # holdout with refine: 2×(31+10)×5=410 > 350; without: 2×31×5=310 <= 350 -> refine off, loud.
+    fs = FeatureSelectionConfig(compare=_CMP, n_runs=30, cost_budget_refits=350)
+    with caplog.at_level("WARNING"):
+        eff, rec = _resolve(fs, n_rows=500)
+    assert eff.refine is False and eff.arbitration == "holdout"
+    assert rec["refine_resolved_from"] == "cost_budget"
+    assert any("refine disabled" in r.message for r in caplog.records)
+
+
 def test_cost_budget_floor_exceeded_raises() -> None:
     fs = FeatureSelectionConfig(
         compare=_CMP, arbitration="nested_per_fold", n_runs=100, cost_budget_refits=10
@@ -451,6 +525,18 @@ def test_uninstalled_boosting_excluded_from_defaults(monkeypatch) -> None:
     monkeypatch.setattr(regmod, "_module_present", lambda module: False)
     c = build_default_components(Task(kind="binary"), random_state=0)
     assert set(c.estimators) == {"baseline", "linear"}
+
+
+def test_models_none_excludes_xgboost_even_when_installed() -> None:
+    pytest.importorskip("xgboost")
+    c = build_default_components(Task(kind="binary"), random_state=0)
+    assert "xgboost" not in c.estimators  # default_on=False opts it out of the default zoo
+    assert {"baseline", "linear"} <= set(c.estimators)
+    # explicit opt-in still selects it (default_on gates only models=None)
+    explicit = build_default_components(
+        Task(kind="binary"), random_state=0, models=("xgboost", "linear")
+    )
+    assert "xgboost" in explicit.estimators
 
 
 def test_policy_direction_synced_to_metric() -> None:

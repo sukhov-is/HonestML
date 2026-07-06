@@ -6,6 +6,60 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Two-stage cascade feature selection (ADR-0100):** ranker strategies now refine the coarse
+  cutoff with an importance-ordered backward descent whose final size the significance band +
+  Occam pick (the honest analog of manual backward elimination). New
+  `FeatureSelectionConfig.refine` (default **True**), `refine_max_features` (default 200, the
+  pre-cap survivor set stays the band anchor so a harmful truncation is vetoed) and
+  `refine_drop_frac` (default 0.05); the run-report `feature_selection` block gains a `refine`
+  section (`n_after_rank`/`n_after_refine`/`trajectory_len`/`capped`). The cost-budget gate
+  (`cost_budget_refits`) accounts for the trajectory and sheds `refine` before failing at the
+  holdout floor.
+- Loud WARNING when a time-series run early-stops on a degenerately small es tail
+  (`CVConfig.n_es`, default 1 row): stopping decisions are noise and boosting fits may run to
+  the 1000-tree ES ceiling — also affects the HPO inner folds; sizing advice included.
+- Composition-time WARNING when `calibrate != "off"` is combined with a time-series scheme
+  (previously only a ship-time notice, after all training): TS calibration is inert until the
+  expanding-gate design lands.
+- Run-report `hpo` block gains `tuned_on: "fs_subset" | "dev_full"` (ADR-0102).
+
+### Changed
+- **Feature selection defaults change results:** `refine=True` is the new default for ranker FS
+  strategies — selected subsets (typically far smaller), leaderboards and shipped models change
+  for every `fs=`-enabled run; `refine=False` restores pre-1.1 selection exactly. The
+  run-fingerprint changes for **all** FS configs (new config fields in the dump), so caches
+  recompute cold (never a stale hit). Single-ranker runs now also report
+  `selected_strategy`/`arbitration_effective`.
+- **HPO tunes on the post-FS feature subset (ADR-0102, supersedes ADR-0062 §2a):** tuning runs
+  inside the selection slice after the FS projection, so the inner objective sees the pruned
+  width (was: full DEV width, disclosed as `tuned_on_full_feature_space`). Runs with both `hpo`
+  and `feature_selection` select different hyperparameters and may ship a different model; runs
+  without FS (or without HPO) are byte-identical. `tuned_on_full_feature_space` is now pinned
+  `False`; `timings.run.selection` includes the hpo seconds; with `keep_baseline=True` the
+  fingerprint derives the `__tuned` candidate ids from the tunable set (config intent) instead
+  of the completed searches.
+- **`models=None` no longer selects `xgboost` by default:** it never outperforms
+  catboost/lightgbm on the honesty benchmarks, has no native categorical handling and burns
+  HPO/CV budget. It stays listed in `available_models()` and fully available via explicit
+  `models=("xgboost", ...)` (new `ComponentDescriptor.default_on` flag). Default-run
+  fingerprints stop version-pinning xgboost, so old caches miss (correct: the effective
+  config changed).
+- **Performance, bit-neutral (ADR-0101):** feature-selection ranker-model fits (ExtraTrees) use
+  all cores (prediction stays sequential — results byte-identical); the baseline candidates fit
+  a bare Dummy on a constant column instead of running a median imputer over the full matrix
+  per fold (predictions byte-identical, minutes + GBs of transient RAM saved); the time-series
+  significance band memoizes repeated block-bootstrap draws (~×250 fewer metric evaluations per
+  pairwise test, deltas byte-identical).
+
+### Fixed
+- **Feature selection no longer crashes on NaN in numeric features:** the estimator-agnostic
+  ranker-model (ExtraTrees) and the arbitration/gate/sequential scorer median-impute per call
+  from TRAIN statistics (test rows filled with train medians — leak-free; an all-NaN column
+  imputes to 0.0; NaN-free data passes through untouched, byte-identical). Candidate models
+  still receive native NaN. The SHAP ranker imputes once so the model, the explained rows and
+  the (KMeans) background all see the same matrix.
+
 ## [1.0.0] - 2026-06-24
 
 First public release: a tabular AutoML library for binary/multiclass classification and

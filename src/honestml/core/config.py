@@ -152,9 +152,12 @@ class FeatureSelectionConfig(BaseModel):
     ``"nested"`` (K-fold on DEV; timeseries = expanding-window) with an honest significance winner.
     Anti-leakage OOF ranking/scoring lives in the application; the winning subset serializes into
     ``FeatureSchema``. ``cutoff`` applies only to ranker strategies — ``sequential`` returns its own
-    subset (``seq_*``). ``null_importance`` works on every scheme: i.i.d. schemes permute uniformly,
-    ``timeseries``/``group`` permute the target WITHIN structure blocks of ``null_block_size``
-    rows / per group. Per-strategy randomness is isolated via a stable seed hash.
+    subset (``seq_*``). Ranker strategies run a two-stage cascade by default (ADR-0100): the coarse
+    cutoff is refined by an importance-ordered backward descent whose final size the significance
+    band picks; ``refine=False`` restores the single-cut path exactly. ``null_importance`` works on
+    every scheme: i.i.d. schemes permute uniformly, ``timeseries``/``group`` permute the target
+    WITHIN structure blocks of ``null_block_size`` rows / per group. Per-strategy randomness is
+    isolated via a stable seed hash.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -220,6 +223,22 @@ class FeatureSelectionConfig(BaseModel):
     seq_patience: int = Field(
         default=2, ge=1, description="sequential plateau patience (no-improve steps)"
     )
+    # two-stage cascade (ADR-0100): ranker cut -> importance-ordered backward refinement, final size
+    # picked by the significance band + Occam. The floor is the shared seq_min_features.
+    refine: bool = Field(
+        default=True, description="stage-2 backward refinement after a ranker cut (cascade)"
+    )
+    refine_max_features: int | None = Field(
+        default=200,
+        ge=1,
+        description="cap on stage-2 entry size (top-k by stage-1 score); None = no cap",
+    )
+    refine_drop_frac: float = Field(
+        default=0.05,
+        gt=0.0,
+        lt=1.0,
+        description="fraction of the current subset dropped per refinement step",
+    )
     random_state: int | None = Field(default=None, description="None -> inherits RunConfig.seed")
 
     @model_validator(mode="after")
@@ -234,6 +253,12 @@ class FeatureSelectionConfig(BaseModel):
         if self.null_block_mode == "time_window" and self.null_block_window is None:
             raise ValueError(
                 "null_block_mode='time_window' requires null_block_window (the Δt window width)"
+            )
+        # dead-config (ADR-0100): the refine_* knobs only act when the refinement stage runs
+        if not self.refine and {"refine_max_features", "refine_drop_frac"} & self.model_fields_set:
+            raise ValueError(
+                "refine=False disables the refinement stage; drop refine_max_features/"
+                "refine_drop_frac or set refine=True"
             )
         return self
 

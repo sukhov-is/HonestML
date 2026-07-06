@@ -196,12 +196,21 @@ def build_default_components(
     # (ADR-0031 §5), n_calib=None keeps 'auto' deterministic at sigmoid for the selection path.
     if task.kind == "regression" and cv_config.calibrate != "off":
         raise ConfigError("probability calibration is classification-only; set calibrate='off'")
+    # dead-config, warned BEFORE any training (the ship-time skip fires hours later and never in
+    # run_mode='selection'): the TS cross-fit gate would look ahead, so calibration is disabled there.
+    if cv_config.calibrate != "off" and cv_config.scheme in _TIME_SCHEMES:
+        logger.warning(
+            "calibrate=%r has no effect on a time-series scheme (expanding-gate calibration is "
+            "future, ADR-0031 §3); the winner ships uncalibrated",
+            cv_config.calibrate,
+        )
     refinement_calibrator: CalibratorFactory | None = None
     if cv_config.selection == "refinement":
         method = cv_config.calibrate if cv_config.calibrate != "off" else "sigmoid"
         refinement_calibrator = resolve_calibrator(method)
-    # FS routing (ADR-0046 §2): the M6c compare/sequential path needs the second port + carve + scorer;
-    # a single ranker strategy (importance/random_probe/null_importance) stays the M6b path (feature_ranker).
+    # FS routing (ADR-0046 §2): the compare path carries M6c compare/sequential AND the single-ranker
+    # cascade (refine, ADR-0100) — it needs the second port + carve + scorer; a single ranker strategy
+    # with refine=False stays the legacy M6b path (feature_ranker), bit-identical.
     fs_ranker: FeatureRanker | None = None
     fs_strategies: tuple[tuple[str, Strategy], ...] | None = None
     fs_carve: SelectionCarve | None = None
@@ -211,22 +220,34 @@ def build_default_components(
         # the estimator-agnostic ranker-model: the M6c arbitration scorer AND the M6b/M6c no-selection
         # gate (finding #10) both score subsets with it, so it is wired whenever FS runs (not only compare).
         fs_fit_predict = _make_fit_predict(task)
-        if feature_selection.compare is not None or feature_selection.strategy == "sequential":
+        if (
+            feature_selection.compare is not None
+            or feature_selection.strategy == "sequential"
+            or feature_selection.refine
+        ):
             fs_strategies = _resolve_strategies(
                 task, feature_selection, full_descent=significance != "off"
             )
             fs_carve = _make_selection_carve(task, cv_config)
             if feature_selection.arbitration in ("nested", "nested_per_fold"):
-                fs_arb_splitter = _resolve_splitter(
-                    cv_config.model_copy(
-                        update={"n_splits": feature_selection.arbitration_n_splits}
-                    ),
-                    task,
-                    random_state,
-                    has_datetime,
-                    has_group,
-                    has_time,
-                )[0]
+                if feature_selection.compare is not None:
+                    fs_arb_splitter = _resolve_splitter(
+                        cv_config.model_copy(
+                            update={"n_splits": feature_selection.arbitration_n_splits}
+                        ),
+                        task,
+                        random_state,
+                        has_datetime,
+                        has_group,
+                        has_time,
+                    )[0]
+                else:
+                    # single-strategy cascade (ADR-0100): nothing to arbitrate — same dead-config
+                    # WARNING as the legacy single-ranker path
+                    logger.warning(
+                        "arbitration=%r has no effect without a `compare` list of >= 2 strategies",
+                        feature_selection.arbitration,
+                    )
         else:
             fs_ranker = _resolve_feature_ranker(task, feature_selection)
             if feature_selection.arbitration in ("nested", "nested_per_fold"):
@@ -273,6 +294,19 @@ def build_default_components(
             logger.warning(
                 "shap_background='kmeans' is set but shap_perturbation='tree_path_dependent' uses no background; "
                 "set shap_perturbation='interventional' to use it"
+            )
+        # dead-config (ADR-0100): refine acts on ranker strategies only; the sequential wrapper is its
+        # own descent. Explicit refine=True on a pure sequential run does nothing -> WARNING, not error
+        # (the default True must not invalidate strategy='sequential').
+        if (
+            "refine" in feature_selection.model_fields_set
+            and feature_selection.refine
+            and feature_selection.compare is None
+            and feature_selection.strategy == "sequential"
+        ):
+            logger.warning(
+                "refine=True has no effect for the pure 'sequential' wrapper strategy; "
+                "it applies to ranker strategies (importance/random_probe/null_importance/shap)"
             )
         _warn_fs_cost(feature_selection)
 
@@ -547,16 +581,34 @@ def resolve_fs_defaults(
 
     if (
         fs.cost_budget_refits is not None
-    ):  # C2: hard ceiling -> downgrade arbitration / fail loud (ADR-0058)
+    ):  # C2: hard ceiling -> downgrade arbitration / drop refine / fail loud (ADR-0058, ADR-0100)
         arb_now = str(updates.get("arbitration", fs.arbitration))
-        chosen = _budget_downgrade(
-            fs,
-            arb_now,
-            budget=fs.cost_budget_refits,
-            n_strategies=n_strategies,
-            n_features=n_features,
-            inner_n_splits=inner_n_splits,
-        )
+
+        def _downgrade(cfg: FeatureSelectionConfig) -> str:
+            return _budget_downgrade(
+                cfg,
+                arb_now,
+                budget=cfg.cost_budget_refits or 0,
+                n_strategies=n_strategies,
+                n_features=n_features,
+                inner_n_splits=inner_n_splits,
+            )
+
+        try:
+            chosen = _downgrade(fs)
+        except ConfigError:
+            # ADR-0100 budget rung: refinement is the cheapest honesty to shed before the loud
+            # floor failure; a run still over budget without it propagates the floor ConfigError.
+            if not fs.refine:
+                raise
+            logger.warning(
+                "cost_budget_refits=%d: the refinement stage exceeds the budget even at holdout "
+                "-> refine disabled (single-cut selection)",
+                fs.cost_budget_refits,
+            )
+            updates["refine"] = False
+            record["refine_resolved_from"] = "cost_budget"
+            chosen = _downgrade(fs.model_copy(update={"refine": False}))
         if chosen != arb_now:
             logger.warning(
                 "cost_budget_refits=%d: arbitration %r exceeds budget -> downgraded to %r",
@@ -866,9 +918,10 @@ def _select_estimators(
     The filter reads ``descriptor.spec.capabilities`` — no ``factory()`` materialization, so
     an unselected heavy adapter is never imported (ADR-0019 §2). Default selection
     (``models=None``) also drops components whose extra is not installed (``is_available``,
-    ADR-0020 §5); an explicitly requested but uninstalled model fails with
-    ``MissingDependencyError``. With ``has_missing`` the data carries NaN: models declaring
-    ``handles_missing=False`` are skipped with a WARNING instead of crashing mid-fit.
+    ADR-0020 §5) and components opting out of the default set (``default_on=False`` — xgboost);
+    an explicitly requested but uninstalled model fails with ``MissingDependencyError``. With
+    ``has_missing`` the data carries NaN: models declaring ``handles_missing=False`` are
+    skipped with a WARNING instead of crashing mid-fit.
     """
     registry = model_registry()
     available = registry.by_name()
@@ -882,7 +935,7 @@ def _select_estimators(
             raise MissingDependencyError(missing[0])
         selected = [n for n in available if n in models]
     else:
-        selected = [n for n in available if registry.is_available(n)]
+        selected = [n for n in available if available[n].default_on and registry.is_available(n)]
 
     keep: dict[str, EstimatorFactory] = {}
     nan_skipped: list[str] = []

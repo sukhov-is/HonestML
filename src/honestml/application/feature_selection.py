@@ -9,6 +9,8 @@ leakage-critical loop, the scale-invariant aggregation and the cutoff+floor — 
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 
 from honestml.core import FeatureRanker, Fold, get_logger
@@ -66,13 +68,40 @@ def _degenerate_counts(block_labels: np.ndarray, y: np.ndarray) -> int:
     return int(np.count_nonzero(distinct_per_block < 2))
 
 
-def _strategy_base(name: str, n_runs: int, n_features: int) -> int:
+def _refine_steps(fs: FeatureSelectionConfig, n_features: int) -> int:
+    """Deterministic upper bound on the refinement trajectory length (ADR-0100).
+
+    Mirrors :func:`refine_trajectory` step-for-step from the worst-case stage-1 survivor count
+    (``top_k``/``top_frac`` bound it; ``auto`` has no a-priori bound below ``n``). Each trajectory
+    point costs one OOF evaluation = ``inner_n_splits`` ranker-model fits, so the count adds to the
+    per-strategy ``base``. Pure loop arithmetic, no RNG (NFR-FSF-1).
+    """
+    if not fs.refine:
+        return 0
+    if fs.cutoff == "top_k":
+        k0 = min(fs.top_k or n_features, n_features)
+    elif fs.cutoff == "top_frac":
+        k0 = max(1, math.ceil(fs.top_frac * n_features))
+    else:  # auto
+        k0 = n_features
+    floor = max(1, fs.seq_min_features)
+    steps = 1  # trajectory[0]: the uncapped survivor set
+    cur = k0
+    if fs.refine_max_features is not None and cur > fs.refine_max_features:
+        cur = fs.refine_max_features
+        steps += 1
+    while cur > floor:
+        cur -= min(max(1, math.ceil(cur * fs.refine_drop_frac)), cur - floor)
+        steps += 1
+    return steps
+
+
+def _strategy_base(name: str, fs: FeatureSelectionConfig, n_features: int) -> int:
     """Per-strategy ranker-fit count for the cost estimator (ADR-0058 §1, upper bound)."""
-    if name == "null_importance":
-        return 1 + n_runs
     if name == "sequential":
         return n_features * n_features  # O(n²) score_subset upper bound (no runtime reference)
-    return 1
+    base = 1 + fs.n_runs if name == "null_importance" else 1
+    return base + _refine_steps(fs, n_features)
 
 
 def estimate_fs_refits(
@@ -84,12 +113,14 @@ def estimate_fs_refits(
     WARNING (``n_strat × arbitration_n_splits × cv.n_splits × (1+n_runs)``). ``base`` is the per-strategy
     ranker-fit count (**max** over compared strategies, upper bound): ``null_importance`` -> ``1+n_runs``;
     ``sequential`` -> ``n_features²`` (O(n²) score_subset upper bound, no runtime reference); else ``1``.
-    ``mult`` is the arbitration factor: ``holdout``/``nested`` -> ``inner_n_splits``; ``nested_per_fold`` ->
-    ``arbitration_n_splits × inner_n_splits``. Pure arithmetic, no RNG (NFR-FSF-1). ``inner_n_splits`` is the
-    main selection splitter's ``cv.n_splits`` (not a config field).
+    Ranker strategies with ``refine`` add the trajectory-length bound (:func:`_refine_steps`, ADR-0100 —
+    one OOF evaluation per visited subset). ``mult`` is the arbitration factor: ``holdout``/``nested`` ->
+    ``inner_n_splits``; ``nested_per_fold`` -> ``arbitration_n_splits × inner_n_splits``. Pure arithmetic,
+    no RNG (NFR-FSF-1). ``inner_n_splits`` is the main selection splitter's ``cv.n_splits`` (not a config
+    field).
     """
     names = set(fs.compare) if fs.compare is not None else {fs.strategy}
-    base = max(_strategy_base(n, fs.n_runs, n_features) for n in names)
+    base = max(_strategy_base(n, fs, n_features) for n in names)
     mult = (
         fs.arbitration_n_splits * inner_n_splits
         if fs.arbitration == "nested_per_fold"
@@ -113,7 +144,7 @@ def _normalize_fold(imp: np.ndarray) -> np.ndarray:
     return imp / total
 
 
-def select_features(
+def aggregate_scores(
     x_full: np.ndarray,
     y: np.ndarray,
     folds: list[Fold],
@@ -123,15 +154,16 @@ def select_features(
     config: FeatureSelectionConfig,
     sample_weight: np.ndarray | None = None,
     groups: np.ndarray | None = None,
-) -> tuple[int, ...]:
-    """OOF feature ranking on the evaluation folds -> one kept-column index subset (ADR-0044 §1).
+) -> np.ndarray:
+    """OOF feature ranking on the evaluation folds -> one aggregate score vector (ADR-0044 §1).
 
     For each fold the ranker scores features on the train part (``fit ⊕ es``, never ``test``); per-fold
-    scores are normalized and averaged; :func:`apply_cutoff` turns the aggregate into a subset with a
-    ``>= 1`` floor. ``folds`` is the SAME list ``run_slice`` evaluates on, so selection and evaluation
-    share folds (R-FS-FOLD-ALIGN). ``categorical`` is the per-column mask of ``x_full``. ``groups`` (M6d)
-    is the per-row structure label, sliced to each fold's train rows for structure-aware rankers; the
-    sliced labels stay aligned with the train rows, so the ranker still never sees test rows (ADR-0050).
+    scores are normalized and averaged. The cascade (ADR-0100) ranks ONCE and reuses this aggregate for
+    both the cutoff and the refinement drop order. ``folds`` is the SAME list ``run_slice`` evaluates on,
+    so selection and evaluation share folds (R-FS-FOLD-ALIGN). ``categorical`` is the per-column mask of
+    ``x_full``. ``groups`` (M6d) is the per-row structure label, sliced to each fold's train rows for
+    structure-aware rankers; the sliced labels stay aligned with the train rows, so the ranker still
+    never sees test rows (ADR-0050).
     """
     n_features = x_full.shape[1]
     random_state = config.random_state if config.random_state is not None else 0
@@ -160,8 +192,69 @@ def select_features(
             )
         scores += _normalize_fold(imp)
         k += 1
-    agg = scores / max(k, 1)
-    return apply_cutoff(agg, config, ranker.auto_threshold(n_features))
+    return scores / max(k, 1)
+
+
+def select_features(
+    x_full: np.ndarray,
+    y: np.ndarray,
+    folds: list[Fold],
+    *,
+    ranker: FeatureRanker,
+    categorical: np.ndarray,
+    config: FeatureSelectionConfig,
+    sample_weight: np.ndarray | None = None,
+    groups: np.ndarray | None = None,
+) -> tuple[int, ...]:
+    """Single-cut selection: :func:`aggregate_scores` + :func:`apply_cutoff` (ADR-0044 §1).
+
+    The legacy M6b path (``refine=False``); the cascade path composes the same pieces with
+    :func:`refine_trajectory` in the application compare (ADR-0100).
+    """
+    agg = aggregate_scores(
+        x_full,
+        y,
+        folds,
+        ranker=ranker,
+        categorical=categorical,
+        config=config,
+        sample_weight=sample_weight,
+        groups=groups,
+    )
+    return apply_cutoff(agg, config, ranker.auto_threshold(x_full.shape[1]))
+
+
+def refine_trajectory(
+    subset: tuple[int, ...],
+    agg: np.ndarray,
+    *,
+    max_features: int | None,
+    drop_frac: float,
+    min_features: int,
+) -> tuple[tuple[int, ...], ...]:
+    """Deterministic backward-descent trajectory over the stage-1 survivors (ADR-0100).
+
+    Pure arithmetic over the aggregate score vector — zero ``score_subset`` calls; the honest
+    Same-OOF scoring of every visited subset happens in ``_band_over_trajectory``. The drop order
+    is descending ``agg`` with :func:`apply_cutoff`'s stable tie semantics. ``trajectory[0]`` is
+    the UNCAPPED survivor set, so the band's anchor can veto a harmful ``max_features`` truncation
+    (the capped top-k set is the next point when it applies); each step then drops the
+    ``max(1, ceil(len*drop_frac))`` weakest members, clamped to the ``>= max(1, min_features)``
+    floor. Sizes strictly decrease; every subset is emitted sorted by column position (FR-FS-7).
+    """
+    floor = max(1, min_features)
+    members = set(subset)
+    order = [int(i) for i in np.argsort(-agg, kind="stable") if int(i) in members]
+    trajectory: list[tuple[int, ...]] = [tuple(sorted(order))]
+    current = order
+    if max_features is not None and len(current) > max_features:
+        current = current[:max_features]
+        trajectory.append(tuple(sorted(current)))
+    while len(current) > floor:
+        drop = min(max(1, math.ceil(len(current) * drop_frac)), len(current) - floor)
+        current = current[:-drop]
+        trajectory.append(tuple(sorted(current)))
+    return tuple(trajectory)
 
 
 def apply_cutoff(
