@@ -354,9 +354,13 @@ def test_refine_trajectory_cap_clamped_to_floor() -> None:
 
 def test_mass_floor_profiles_and_signed() -> None:
     # ADR-0104/FR-3/NFR-5: dominant importance -> low floor; spread -> high; signed clamped; off/no-mass -> 0
-    assert mass_floor(np.array([0.99, 0.005, 0.003, 0.002]), 0.95) == 1  # one feature covers the mass
+    assert (
+        mass_floor(np.array([0.99, 0.005, 0.003, 0.002]), 0.95) == 1
+    )  # one feature covers the mass
     assert mass_floor(np.full(20, 1.0), 0.95) == 19  # uniform: need 19/20 to reach 0.95
-    assert mass_floor(np.array([0.8, -0.5, 0.2]), 0.9) == 2  # negative clamped to 0, not counted as mass
+    assert (
+        mass_floor(np.array([0.8, -0.5, 0.2]), 0.9) == 2
+    )  # negative clamped to 0, not counted as mass
     assert mass_floor(np.array([0.99, 0.01]), 0.0) == 0  # refine_min_mass=0 -> disabled
     assert mass_floor(np.array([-1.0, -2.0]), 0.99) == 0  # no positive mass -> not active
 
@@ -379,11 +383,19 @@ def test_mass_floor_keeps_cost_estimate_upper_bound() -> None:
     n = 40
     agg = np.concatenate([np.full(10, 1.0), np.zeros(n - 10)])  # 10 features carry all the mass
     fs = FeatureSelectionConfig(
-        strategy="importance", cutoff="top_frac", top_frac=1.0, refine_drop_frac=0.25, refine_min_mass=0.99
+        strategy="importance",
+        cutoff="top_frac",
+        top_frac=1.0,
+        refine_drop_frac=0.25,
+        refine_min_mass=0.99,
     )
     floor = max(1, fs.min_features, fs.seq_min_features, mass_floor(agg, fs.refine_min_mass))  # ~10
     actual = refine_trajectory(
-        tuple(range(n)), agg, max_features=fs.refine_max_features, drop_frac=0.25, min_features=floor
+        tuple(range(n)),
+        agg,
+        max_features=fs.refine_max_features,
+        drop_frac=0.25,
+        min_features=floor,
     )
     est = estimate_fs_refits(fs, n_strategies=1, n_features=n, inner_n_splits=3)
     assert est >= (1 + len(actual)) * 3  # a-priori estimate >= actual mass-floored trajectory cost
@@ -400,9 +412,10 @@ def test_estimate_fs_refits_upper_bound_when_min_features_exceeds_cutoff() -> No
     traj = refine_trajectory(
         tuple(range(8)), np.arange(8, dtype=float), max_features=200, drop_frac=0.25, min_features=1
     )
-    assert estimate_fs_refits(fs, n_strategies=1, n_features=n, inner_n_splits=3) == (
-        1 + len(traj)
-    ) * 3
+    assert (
+        estimate_fs_refits(fs, n_strategies=1, n_features=n, inner_n_splits=3)
+        == (1 + len(traj)) * 3
+    )
 
 
 # --- _normalize_fold (ADR-0044 §1) ---

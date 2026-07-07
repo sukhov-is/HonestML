@@ -170,7 +170,9 @@ def test_finalize_with_feature_selection_predicts() -> None:
     )
     # single-cut (refine=False) + two-sided gate (refine_tol=0) so the 3-feature subset ships and the
     # ds_full-projection is exercised; the adaptive non-inferiority gate has its own tests
-    fs = FeatureSelectionConfig(strategy="random_probe", cutoff="top_k", top_k=3, refine=False, refine_tol=0.0)
+    fs = FeatureSelectionConfig(
+        strategy="random_probe", cutoff="top_k", top_k=3, refine=False, refine_tol=0.0
+    )
     model = AutoML(
         task="binary",
         models=("linear",),

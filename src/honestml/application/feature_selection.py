@@ -91,7 +91,9 @@ def _refine_steps(fs: FeatureSelectionConfig, n_features: int) -> int:
     steps = 1  # trajectory[0]: the uncapped survivor set
     cur = k0
     if fs.refine_max_features is not None:
-        cap = max(fs.refine_max_features, floor)  # F126: the cap never truncates below the descent floor
+        cap = max(
+            fs.refine_max_features, floor
+        )  # F126: the cap never truncates below the descent floor
         if cur > cap:
             cur = cap
             steps += 1

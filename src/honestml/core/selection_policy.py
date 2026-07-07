@@ -197,7 +197,12 @@ def _band_members(
             )
             if margin is not None
             else test.equivalent(
-                c.oof_pred[mask], anchor_pred, yt, alpha=policy.alpha, block_index=bi, sample_weight=sw
+                c.oof_pred[mask],
+                anchor_pred,
+                yt,
+                alpha=policy.alpha,
+                block_index=bi,
+                sample_weight=sw,
             )
         )
         if member:

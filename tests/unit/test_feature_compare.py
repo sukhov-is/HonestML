@@ -64,7 +64,9 @@ class _FakeDataset:
 
 
 class _FakeSplitter:
-    n_splits = 2  # declared inner fold count for the cost estimate / inner-C5 gate (SupportsNSplits, F139)
+    n_splits = (
+        2  # declared inner fold count for the cost estimate / inner-C5 gate (SupportsNSplits, F139)
+    )
 
     def split(self, dataset):
         n = dataset._n
@@ -203,29 +205,38 @@ def test_cascade_refines_to_compact_subset() -> None:
     # top_frac=1.0 keeps all 4 -> cap 3 -> descent to the floor; with no significance test the band
     # collapses to argmax, and _fit_predict_small makes the most compact point win
     cfg = FeatureSelectionConfig(
-        compare=("importance",), cutoff="top_frac", top_frac=1.0,
-        refine_max_features=3, refine_drop_frac=0.34,
+        compare=("importance",),
+        cutoff="top_frac",
+        top_frac=1.0,
+        refine_max_features=3,
+        refine_drop_frac=0.34,
     )
     out = _run_cascade(_fit_predict_small, cfg)
     assert out.winner_idx == (0,)  # strongest stage-1 feature survives to the floor
-    assert out.refine == {  # FR-7: the refine block also discloses the effective floor and adaptive knobs
-        "n_after_rank": 4,
-        "n_after_refine": 1,
-        "trajectory_len": 3,  # (0,1,2,3) -> capped (0,1,2) -> (0,)
-        "capped": True,
-        "floor": 1,
-        "floor_source": "min_features",
-        "refine_tol": 0.0,
-        "refine_min_mass": 0.0,
-    }
+    assert (
+        out.refine
+        == {  # FR-7: the refine block also discloses the effective floor and adaptive knobs
+            "n_after_rank": 4,
+            "n_after_refine": 1,
+            "trajectory_len": 3,  # (0,1,2,3) -> capped (0,1,2) -> (0,)
+            "capped": True,
+            "floor": 1,
+            "floor_source": "min_features",
+            "refine_tol": 0.0,
+            "refine_min_mass": 0.0,
+        }
+    )
 
 
 def test_cascade_band_anchor_vetoes_harmful_cap() -> None:
     # under the wider-is-better _fit_predict the argmax is trajectory[0] — the UNCAPPED survivor
     # set — so a harmful refine_max_features truncation is refused, never silently applied
     cfg = FeatureSelectionConfig(
-        compare=("importance",), cutoff="top_frac", top_frac=1.0,
-        refine_max_features=3, refine_drop_frac=0.34,
+        compare=("importance",),
+        cutoff="top_frac",
+        top_frac=1.0,
+        refine_max_features=3,
+        refine_drop_frac=0.34,
     )
     out = _run_cascade(_fit_predict, cfg)
     assert out.winner_idx == (0, 1, 2, 3)
@@ -241,7 +252,10 @@ def test_cascade_refine_off_keeps_single_cut() -> None:
 
 def test_cascade_respects_floor() -> None:
     cfg = FeatureSelectionConfig(
-        compare=("importance",), cutoff="top_frac", top_frac=1.0, seq_min_features=2,
+        compare=("importance",),
+        cutoff="top_frac",
+        top_frac=1.0,
+        seq_min_features=2,
     )
     out = _run_cascade(_fit_predict_small, cfg)
     assert len(out.winner_idx) == 2  # descent stops at the seq_min_features floor
@@ -250,10 +264,18 @@ def test_cascade_respects_floor() -> None:
 
 def test_cascade_respects_min_features_floor() -> None:
     # FR-4/ADR-0105: min_features (not only seq_min_features) now bounds the cascade descent floor
-    cfg = FeatureSelectionConfig(compare=("importance",), cutoff="top_frac", top_frac=1.0, min_features=3)
+    cfg = FeatureSelectionConfig(
+        compare=("importance",), cutoff="top_frac", top_frac=1.0, min_features=3
+    )
     out = _run_cascade(_fit_predict_small, cfg)
-    assert len(out.winner_idx) == 3  # descent stops at min_features (was ignored by the cascade pre-ADR-0105)
-    assert out.refine is not None and out.refine["floor"] == 3 and out.refine["floor_source"] == "min_features"
+    assert (
+        len(out.winner_idx) == 3
+    )  # descent stops at min_features (was ignored by the cascade pre-ADR-0105)
+    assert (
+        out.refine is not None
+        and out.refine["floor"] == 3
+        and out.refine["floor_source"] == "min_features"
+    )
 
 
 def test_fs_policy_neutral_and_margin() -> None:
@@ -263,7 +285,9 @@ def test_fs_policy_neutral_and_margin() -> None:
     pol = SelectionPolicy(greater_is_better=True)
     assert _fs_policy(pol, _FakeMetric(), 0.0) is pol
     assert _fs_policy(pol, _FakeMetric(), 0.02).margin_frac == 0.02
-    assert _fs_policy(None, _FakeMetric(), 0.02).margin_frac == 0.02  # None -> derived default policy
+    assert (
+        _fs_policy(None, _FakeMetric(), 0.02).margin_frac == 0.02
+    )  # None -> derived default policy
 
 
 def test_cascade_runs_per_strategy_in_holdout_compare() -> None:
@@ -272,9 +296,13 @@ def test_cascade_runs_per_strategy_in_holdout_compare() -> None:
     n, n_features = 40, 4
     x, y = rng.random((n, n_features)), rng.random(n)
     cfg = FeatureSelectionConfig(
-        compare=("importance", "random_probe"), selection_holdout=0.3,
-        cutoff="top_frac", top_frac=1.0, refine_drop_frac=0.5,
-        refine_tol=0.0, refine_min_mass=0.0,  # descent-mechanics test: adaptive knobs off (own tests)
+        compare=("importance", "random_probe"),
+        selection_holdout=0.3,
+        cutoff="top_frac",
+        top_frac=1.0,
+        refine_drop_frac=0.5,
+        refine_tol=0.0,
+        refine_min_mass=0.0,  # descent-mechanics test: adaptive knobs off (own tests)
     )
     out = compare_features(
         _FakeDataset(n),
@@ -333,7 +361,9 @@ class _AllEquivalent:
     def equivalent(self, a, b, y_true, *, alpha=0.05, block_index=None, sample_weight=None):
         return True
 
-    def noninferior(self, a, b, y_true, *, alpha=0.05, margin=0.0, block_index=None, sample_weight=None):
+    def noninferior(
+        self, a, b, y_true, *, alpha=0.05, margin=0.0, block_index=None, sample_weight=None
+    ):
         return True
 
 
@@ -343,7 +373,9 @@ class _NoneEquivalent:
     def equivalent(self, a, b, y_true, *, alpha=0.05, block_index=None, sample_weight=None):
         return False
 
-    def noninferior(self, a, b, y_true, *, alpha=0.05, margin=0.0, block_index=None, sample_weight=None):
+    def noninferior(
+        self, a, b, y_true, *, alpha=0.05, margin=0.0, block_index=None, sample_weight=None
+    ):
         return False
 
 
@@ -727,8 +759,13 @@ def _run_loss_arbitration(arbitration, sig_test, *, n=40, n_features=4):
         y,
         task=_FakeTask(),
         metric=_FakeLossMetric(),
-        strategies=[("good", _FixedSelector("good", (0,))), ("bad", _FixedSelector("bad", (0, 1, 2)))],
-        config=FeatureSelectionConfig(compare=("importance", "random_probe"), arbitration=arbitration),
+        strategies=[
+            ("good", _FixedSelector("good", (0,))),
+            ("bad", _FixedSelector("bad", (0, 1, 2))),
+        ],
+        config=FeatureSelectionConfig(
+            compare=("importance", "random_probe"), arbitration=arbitration
+        ),
         splitter=_FakeSplitter(),
         carve=_carve,
         fit_predict=_fit_predict,
@@ -921,7 +958,10 @@ def test_gate_threads_refine_tol_to_noninferiority() -> None:
     # decided by the rule under test (noninferior) rather than being the always-kept anchor.
     sig = _KeepTwoSidedVetoNI()
     assert _gate((1, 2, 3), sig, refine_tol=0.0)[0] is True  # equivalent -> subset kept
-    assert _gate((1, 2, 3), sig, refine_tol=0.05) == (False, "no_selection_better")  # noninferior -> vetoed
+    assert _gate((1, 2, 3), sig, refine_tol=0.05) == (
+        False,
+        "no_selection_better",
+    )  # noninferior -> vetoed
 
 
 # --- in-sequential significance band over the trajectory (ADR-0083..0086, FR-1/2/5/6) ---

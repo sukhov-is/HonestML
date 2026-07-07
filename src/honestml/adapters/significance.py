@@ -60,7 +60,12 @@ class BootstrapSignificanceTest:
         sample_weight: np.ndarray | None = None,
     ) -> bool:
         finite = self._finite_deltas(
-            pred_a, pred_b, y_true, alpha=alpha, block_index=block_index, sample_weight=sample_weight
+            pred_a,
+            pred_b,
+            y_true,
+            alpha=alpha,
+            block_index=block_index,
+            sample_weight=sample_weight,
         )
         if finite.size == 0 or float(np.ptp(finite)) == 0.0:
             return True  # degenerate / all-NaN CI -> conservatively include (operational §5)
@@ -85,7 +90,12 @@ class BootstrapSignificanceTest:
         # lower one-sided (1-alpha) bound of improvement >= -margin.
         orient = 1.0 if self.metric.greater_is_better else -1.0
         finite = self._finite_deltas(
-            pred_a, pred_b, y_true, alpha=alpha, block_index=block_index, sample_weight=sample_weight
+            pred_a,
+            pred_b,
+            y_true,
+            alpha=alpha,
+            block_index=block_index,
+            sample_weight=sample_weight,
         )
         if finite.size == 0:
             return False  # no evidence -> conservatively not non-inferior (keep more features)

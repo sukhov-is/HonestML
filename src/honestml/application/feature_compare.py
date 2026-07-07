@@ -190,7 +190,9 @@ def no_selection_gate(
     ]
     band = equivalence_band(
         candidates,
-        _fs_policy(policy, metric, refine_tol),  # ADR-0103: non-inferiority gate (same margin as the cascade)
+        _fs_policy(
+            policy, metric, refine_tol
+        ),  # ADR-0103: non-inferiority gate (same margin as the cascade)
         significance_test,
         y,
         block_index=block_index,
@@ -315,7 +317,11 @@ def _fs_policy(
     policy: SelectionPolicy | None, metric: Metric, refine_tol: float
 ) -> SelectionPolicy:
     """FS band policy: one-sided non-inferiority margin (``refine_tol>0``) or the two-sided default (ADR-0103)."""
-    base = policy if policy is not None else SelectionPolicy(greater_is_better=metric.greater_is_better)
+    base = (
+        policy
+        if policy is not None
+        else SelectionPolicy(greater_is_better=metric.greater_is_better)
+    )
     return base.model_copy(update={"margin_frac": refine_tol}) if refine_tol > 0.0 else base
 
 
@@ -409,7 +415,9 @@ def _select_one(
     if not config.refine:
         return subset1, None, None
     mass_floor_val = mass_floor(agg, config.refine_min_mass)  # ADR-0104: signal-mass insurance
-    floor = max(1, config.min_features, config.seq_min_features, mass_floor_val)  # ADR-0105: unified floor
+    floor = max(
+        1, config.min_features, config.seq_min_features, mass_floor_val
+    )  # ADR-0105: unified floor
     if len(subset1) <= floor:
         return subset1, None, None
     trajectory = refine_trajectory(
@@ -432,7 +440,9 @@ def _select_one(
         global_classes=global_classes,
         groups=groups,
         significance_test=significance_test,
-        policy=_fs_policy(policy, metric, config.refine_tol),  # ADR-0103: non-inferiority on the ranker cascade
+        policy=_fs_policy(
+            policy, metric, config.refine_tol
+        ),  # ADR-0103: non-inferiority on the ranker cascade
     )
     meta: dict[str, object] = {
         "n_after_rank": len(subset1),
@@ -766,7 +776,9 @@ def _per_fold_winner(
         # scorer output is higher-is-better (sign-flipped); flip back to the metric's own orientation
         # for the metric-oriented policy, exactly like _band_over_trajectory/no_selection_gate (F121)
         candidates.append(
-            Candidate(id=name, score=sign * score, n_features=n_key, oof_pred=oof_vec, oof_mask=mask)
+            Candidate(
+                id=name, score=sign * score, n_features=n_key, oof_pred=oof_vec, oof_mask=mask
+            )
         )
     band = equivalence_band(
         candidates, policy, significance_test, y, block_index=groups, sample_weight=sample_weight

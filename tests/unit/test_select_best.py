@@ -25,7 +25,9 @@ class _AllEquivalent:
     def equivalent(self, pred_a, pred_b, y_true, *, alpha, block_index=None, sample_weight=None):
         return True
 
-    def noninferior(self, pred_a, pred_b, y_true, *, alpha, margin, block_index=None, sample_weight=None):
+    def noninferior(
+        self, pred_a, pred_b, y_true, *, alpha, margin, block_index=None, sample_weight=None
+    ):
         return True
 
 

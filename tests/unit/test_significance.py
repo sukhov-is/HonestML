@@ -348,7 +348,9 @@ def test_noninferior_orientation_knife_edge(metric_cls) -> None:
     hi, lo = 0.5, 0.3
     ref_level, worse_level = (hi, lo) if metric.greater_is_better else (lo, hi)
     ref = ref_level + rng.normal(0.0, 0.015, n)  # the anchor (best)
-    worse = worse_level + rng.normal(0.0, 0.015, n)  # genuinely worse by 0.2 in the metric's direction
+    worse = worse_level + rng.normal(
+        0.0, 0.015, n
+    )  # genuinely worse by 0.2 in the metric's direction
     equal = ref_level + rng.normal(0.0, 0.015, n)  # same level as the anchor
     sig = BootstrapSignificanceTest(metric=metric, n_boot=2000, seed=0)
     margin = 0.01 * abs(float(np.mean(ref)))
@@ -401,5 +403,9 @@ def test_noninferiority_band_stops_prune_at_low_power() -> None:
     non_inferior = equivalence_band(
         [anchor, worse], SelectionPolicy(margin_frac=0.01), sig, y
     ).member_ids
-    assert "worse" in two_sided  # can't distinguish -> two-sided over-prunes (keeps the compact worse one)
-    assert "worse" not in non_inferior  # wide CI -> lower bound << -margin -> non-inferiority excludes it
+    assert (
+        "worse" in two_sided
+    )  # can't distinguish -> two-sided over-prunes (keeps the compact worse one)
+    assert (
+        "worse" not in non_inferior
+    )  # wide CI -> lower bound << -margin -> non-inferiority excludes it

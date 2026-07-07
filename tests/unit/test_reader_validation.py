@@ -60,6 +60,9 @@ def test_pandas_string_reads_without_pyarrow(monkeypatch: pytest.MonkeyPatch) ->
 def test_from_pandas_fallback_parity_with_pyarrow() -> None:
     # F134: the pyarrow-free column-wise fallback must match pl.from_pandas value-for-value (input
     # parity is a train<->inference honesty precondition), across nulls in every dtype family.
+    # the reference side (pl.from_pandas on nullable/categorical/datetime columns) needs pyarrow,
+    # which the plain `unit` matrix installs without — gate the parity check on it being present.
+    pytest.importorskip("pyarrow")
     df = pd.DataFrame(
         {
             "f": [1.0, np.nan, 3.0, 4.0],  # float + NaN -> null

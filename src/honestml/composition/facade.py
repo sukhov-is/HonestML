@@ -620,9 +620,7 @@ class AutoML(BaseEstimator, ClassifierMixin):
         tuner = components.tuner
         inner_splitter = components.inner_splitter
 
-        def tune(
-            ds_dev: Dataset, selected: tuple[str, ...] | None
-        ) -> dict[str, TuneOutcome]:
+        def tune(ds_dev: Dataset, selected: tuple[str, ...] | None) -> dict[str, TuneOutcome]:
             with ctx.timed_stage("run", "hpo"):
                 return tune_estimators(
                     ds_dev,
@@ -650,9 +648,7 @@ class AutoML(BaseEstimator, ClassifierMixin):
             outcomes: dict[str, TuneOutcome],
         ) -> dict[str, EstimatorFactory]:
             return {
-                (f"{name}__tuned" if hpo.keep_baseline else name): make_factory(
-                    name, o.best_params
-                )
+                (f"{name}__tuned" if hpo.keep_baseline else name): make_factory(name, o.best_params)
                 for name, o in outcomes.items()
             }
 
