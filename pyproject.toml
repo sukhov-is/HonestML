@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "honestml"
-version = "1.0.0"
+version = "1.1.0"
 description = "General tabular AutoML library (classification + regression), production-grade."
 readme = "README.md"
 requires-python = ">=3.10"

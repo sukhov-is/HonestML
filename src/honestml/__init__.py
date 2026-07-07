@@ -40,7 +40,7 @@ from .core import (
     select_best,
 )
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 # lazy: facade + artifact (resolved via the composition barrel, itself lazy) — keeps `import honestml` slim
 _SUBMODULES = {

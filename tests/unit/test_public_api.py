@@ -53,7 +53,7 @@ def test_public_surface_is_pinned() -> None:
 
 
 def test_version_present() -> None:
-    assert honestml.__version__ == "1.0.0"
+    assert honestml.__version__ == "1.1.0"
 
 
 def test_feature_selection_config_exported() -> None:
