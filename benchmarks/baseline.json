@@ -13,8 +13,7 @@
         "baseline",
         "catboost",
         "lightgbm",
-        "linear",
-        "xgboost"
+        "linear"
       ],
       "optimism": 0.01757,
       "selection_score": 0.99806,
@@ -34,8 +33,7 @@
         "baseline",
         "catboost",
         "lightgbm",
-        "linear",
-        "xgboost"
+        "linear"
       ],
       "optimism": -5.519151,
       "selection_score": 56.025431,
@@ -54,8 +52,7 @@
         "baseline",
         "catboost",
         "lightgbm",
-        "linear",
-        "xgboost"
+        "linear"
       ],
       "optimism": 0.015572,
       "selection_score": 0.946683,
@@ -66,7 +63,6 @@
       "atol": 0.02,
       "band_members": [
         "lightgbm",
-        "xgboost",
         "catboost"
       ],
       "greater_is_better": true,
@@ -76,8 +72,7 @@
         "baseline",
         "catboost",
         "lightgbm",
-        "linear",
-        "xgboost"
+        "linear"
       ],
       "optimism": 0.102163,
       "selection_score": 0.839436,
@@ -88,8 +83,7 @@
       "atol": 0.02,
       "band_members": [
         "catboost",
-        "lightgbm",
-        "xgboost"
+        "lightgbm"
       ],
       "greater_is_better": true,
       "holdout_score": 0.94,
@@ -98,8 +92,7 @@
         "baseline",
         "catboost",
         "lightgbm",
-        "linear",
-        "xgboost"
+        "linear"
       ],
       "optimism": 0.001614,
       "selection_score": 0.941614,
@@ -118,8 +111,7 @@
         "baseline",
         "catboost",
         "lightgbm",
-        "linear",
-        "xgboost"
+        "linear"
       ],
       "optimism": -0.044327,
       "selection_score": 0.420328,
@@ -138,8 +130,7 @@
         "baseline",
         "catboost",
         "lightgbm",
-        "linear",
-        "xgboost"
+        "linear"
       ],
       "optimism": -0.279613,
       "selection_score": 9.910617,
@@ -151,8 +142,7 @@
       "band_members": [
         "catboost",
         "lightgbm",
-        "linear",
-        "xgboost"
+        "linear"
       ],
       "greater_is_better": false,
       "holdout_score": 5.516755,
@@ -161,8 +151,7 @@
         "baseline",
         "catboost",
         "lightgbm",
-        "linear",
-        "xgboost"
+        "linear"
       ],
       "optimism": -3.023315,
       "selection_score": 8.54007,
@@ -183,8 +172,7 @@
         "baseline",
         "catboost",
         "lightgbm",
-        "linear",
-        "xgboost"
+        "linear"
       ],
       "optimism": -0.041176,
       "selection_score": 0.089706,
@@ -196,7 +184,7 @@
   "seed": 20260612,
   "versions": {
     "catboost": "1.2.10",
-    "honestml": "1.0.0",
+    "honestml": "1.1.0",
     "lightgbm": "4.6.0",
     "numpy": "2.4.6",
     "scikit-learn": "1.9.0",

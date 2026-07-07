@@ -69,6 +69,9 @@ All notable changes to this project are documented here. The format follows
   per fold (predictions byte-identical, minutes + GBs of transient RAM saved); the time-series
   significance band memoizes repeated block-bootstrap draws (~×250 fewer metric evaluations per
   pairwise test, deltas byte-identical).
+- **Honesty-benchmark baseline regenerated (`benchmarks/baseline.json`)** for the new default
+  zoo: xgboost drops out of every dataset's candidate set; winners and per-dataset optimism are
+  otherwise unchanged within tolerance.
 
 ### Fixed
 - **Baseline models saved by 1.0.0 stay loadable and predict (F122):** the bit-neutral perf batch
