@@ -85,8 +85,11 @@ The whole tuning story is disclosed in `run_report_["hpo"]`: the per-model
 `chosen_params`, inner score and trial count, the cost estimate
 (`n_trials × inner_cv` fits per tuned model), `deterministic` (`False` under a
 `timeout_s`), and the honesty flags — the selection OOF is computed
-post-tuning, and tuning runs on the full feature width even when feature
-selection is also enabled.
+post-tuning, and, when feature selection is also enabled, tuning runs on the
+**post-selection** feature subset (the inner objective sees the pruned width,
+not full DEV). Which set was tuned on is disclosed as `tuned_on` (`"fs_subset"`
+or `"dev_full"`); `tuned_on_full_feature_space` is pinned `False` — the pre-1.1
+full-width mismatch can no longer occur.
 
 ```python
 from sklearn.datasets import make_classification

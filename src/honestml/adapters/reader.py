@@ -206,8 +206,15 @@ class Reader:
             if isinstance(dtype, np.dtype) and dtype.kind in "biufM":
                 columns.append(pl.Series(str(name), series.to_numpy(), nan_to_null=True))
             else:
+                # vectorized null mask (F132/F133): a per-element pd.isna(v) raises on array-like cells
+                # ("truth value ambiguous") and is O(rows) scalar calls; series.isna() is one C call and
+                # returns False for non-null objects, so array-like cells convert like the pyarrow path.
+                null_mask = series.isna().to_numpy()
                 columns.append(
-                    pl.Series(str(name), [None if pd.isna(v) else v for v in series.tolist()])
+                    pl.Series(
+                        str(name),
+                        [None if is_na else v for is_na, v in zip(null_mask, series.tolist())],
+                    )
                 )
         return pl.DataFrame(columns)
 

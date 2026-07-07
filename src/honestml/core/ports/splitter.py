@@ -73,6 +73,18 @@ class GroupAwareSplitter(Protocol):
     group_aware: bool
 
 
+@runtime_checkable
+class SupportsNSplits(Protocol):
+    """A splitter that declares its fold count (role-interface, ADR-0058).
+
+    K-fold / time-series splitters set ``n_splits``; a holdout splitter has none (it yields one fold).
+    Cost estimates and the inner-C5 gate read it via ``isinstance`` so they need no getattr default and
+    a single source can never diverge — presence == the capability (absent == one fold).
+    """
+
+    n_splits: int
+
+
 def _overlap(a: np.ndarray, b: np.ndarray) -> bool:
     return bool(np.intersect1d(a, b).size > 0)
 

@@ -119,7 +119,8 @@ class Components(NamedTuple):
     # None unless arbitration="nested" with a compare list (timeseries -> expanding-window).
     feature_arbitration_splitter: CVSplitter | None = None
     # M7a HPO (ADR-0061/0062): the resolved Tuner, a tuned-factory builder, the inner-CV splitter and the
-    # tunable name->search_space map. All None when hpo is off; the facade runs the tuning stage on DEV.
+    # tunable name->search_space map. All None when hpo is off; tuning executes inside run_slice via the
+    # TuningBundle after the FS projection (ADR-0102), not on DEV in the facade.
     tuner: Tuner | None = None
     make_factory: MakeFactory | None = None
     inner_splitter: CVSplitter | None = None
@@ -229,33 +230,33 @@ def build_default_components(
                 task, feature_selection, full_descent=significance != "off"
             )
             fs_carve = _make_selection_carve(task, cv_config)
-            if feature_selection.arbitration in ("nested", "nested_per_fold"):
-                if feature_selection.compare is not None:
-                    fs_arb_splitter = _resolve_splitter(
-                        cv_config.model_copy(
-                            update={"n_splits": feature_selection.arbitration_n_splits}
-                        ),
-                        task,
-                        random_state,
-                        has_datetime,
-                        has_group,
-                        has_time,
-                    )[0]
-                else:
-                    # single-strategy cascade (ADR-0100): nothing to arbitrate — same dead-config
-                    # WARNING as the legacy single-ranker path
-                    logger.warning(
-                        "arbitration=%r has no effect without a `compare` list of >= 2 strategies",
-                        feature_selection.arbitration,
-                    )
+            if (
+                feature_selection.arbitration in ("nested", "nested_per_fold")
+                and feature_selection.compare is not None
+            ):
+                fs_arb_splitter = _resolve_splitter(
+                    cv_config.model_copy(
+                        update={"n_splits": feature_selection.arbitration_n_splits}
+                    ),
+                    task,
+                    random_state,
+                    has_datetime,
+                    has_group,
+                    has_time,
+                )[0]
         else:
             fs_ranker = _resolve_feature_ranker(task, feature_selection)
-            if feature_selection.arbitration in ("nested", "nested_per_fold"):
-                # arbitration only acts when comparing >= 2 strategies; a single strategy ignores it
-                logger.warning(
-                    "arbitration=%r has no effect without a `compare` list of >= 2 strategies",
-                    feature_selection.arbitration,
-                )
+        # dead-config (ADR-0052/0100): arbitration only acts when comparing >= 2 strategies; a single
+        # strategy (sequential wrapper, single-ranker cascade, or legacy single cut) ignores it — one
+        # hoisted check covers both FS routing paths
+        if (
+            feature_selection.arbitration in ("nested", "nested_per_fold")
+            and feature_selection.compare is None
+        ):
+            logger.warning(
+                "arbitration=%r has no effect without a `compare` list of >= 2 strategies",
+                feature_selection.arbitration,
+            )
         # per-fold re-selection (ADR-0054) on timeseries is only boundary-leak-safe if the arbitration splitter
         # purges; with purge=0 and no label_time the inner re-selection trains on rows adjacent to outer-test.
         if (
@@ -295,23 +296,33 @@ def build_default_components(
                 "shap_background='kmeans' is set but shap_perturbation='tree_path_dependent' uses no background; "
                 "set shap_perturbation='interventional' to use it"
             )
-        # dead-config (ADR-0100): refine acts on ranker strategies only; the sequential wrapper is its
-        # own descent. Explicit refine=True on a pure sequential run does nothing -> WARNING, not error
-        # (the default True must not invalidate strategy='sequential').
+        # dead-config (ADR-0100): refine acts on ranker strategies only; the sequential wrapper is its own
+        # descent. Any explicit refine setting on a pure sequential run does nothing -> WARNING, not error
+        # (the default refine=True must not invalidate strategy='sequential'; refine=False + refine_* is a
+        # config-validator ValueError, so here refine is effectively True).
+        # refine_tol is excluded: it also drives the no-selection gate (ADR-0103), live for any strategy
+        dead_refine = {
+            "refine",
+            "refine_max_features",
+            "refine_drop_frac",
+            "refine_min_mass",
+        } & feature_selection.model_fields_set
         if (
-            "refine" in feature_selection.model_fields_set
-            and feature_selection.refine
+            feature_selection.refine
             and feature_selection.compare is None
             and feature_selection.strategy == "sequential"
+            and dead_refine
         ):
             logger.warning(
-                "refine=True has no effect for the pure 'sequential' wrapper strategy; "
-                "it applies to ranker strategies (importance/random_probe/null_importance/shap)"
+                "refine settings (%s) have no effect for the pure 'sequential' wrapper strategy; "
+                "they apply to ranker strategies (importance/random_probe/null_importance/shap)",
+                ", ".join(sorted(dead_refine)),
             )
         _warn_fs_cost(feature_selection)
 
     # M7a HPO wiring (ADR-0061/0062): resolve the Tuner (extras-gated), the inner-CV splitter and the
-    # tunable name->search_space map; the facade runs the tuning stage on DEV. All None when hpo is off.
+    # tunable name->search_space map; tuning executes inside run_slice via the TuningBundle after the FS
+    # projection (ADR-0102), not on DEV in the facade. All None when hpo is off.
     tuner: Tuner | None = None
     make_factory: MakeFactory | None = None
     inner_splitter: CVSplitter | None = None
@@ -597,10 +608,14 @@ def resolve_fs_defaults(
         try:
             chosen = _downgrade(fs)
         except ConfigError:
-            # ADR-0100 budget rung: refinement is the cheapest honesty to shed before the loud
-            # floor failure; a run still over budget without it propagates the floor ConfigError.
+            # ADR-0100 budget rung: shed refinement (the cheapest honesty) before the loud floor failure,
+            # but only when that actually clears the budget. For a pure sequential run refine is not in the
+            # cost estimate, so dropping it changes nothing -> the floor ConfigError propagates unshadowed
+            # (F128: no false "refine disabled" WARNING).
             if not fs.refine:
                 raise
+            # re-raises the floor ConfigError if refine was not the blocker (e.g. pure sequential)
+            chosen = _downgrade(fs.model_copy(update={"refine": False}))
             logger.warning(
                 "cost_budget_refits=%d: the refinement stage exceeds the budget even at holdout "
                 "-> refine disabled (single-cut selection)",
@@ -608,7 +623,6 @@ def resolve_fs_defaults(
             )
             updates["refine"] = False
             record["refine_resolved_from"] = "cost_budget"
-            chosen = _downgrade(fs.model_copy(update={"refine": False}))
         if chosen != arb_now:
             logger.warning(
                 "cost_budget_refits=%d: arbitration %r exceeds budget -> downgraded to %r",

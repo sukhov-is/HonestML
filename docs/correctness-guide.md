@@ -104,6 +104,15 @@ never diverge from the local report.
   the validation set on every CV scheme, ADR-0080), but **not** inside inner-CV
   hyperparameter search — there a tuned `n_estimators` is a ceiling that early stopping
   later trims on the selection folds.
+- **Feature-selection size carries a mild in-sample optimism**: with the default
+  refinement cascade (`refine=True`) the subset size is chosen by a **power-adaptive
+  non-inferiority** rule (a more compact size ships only when it is not significantly worse
+  than the best, within `refine_tol`) plus an importance **mass floor** (`refine_min_mass`);
+  the band's anchor is the argmax on the **same** out-of-fold folds it then tests on (the
+  Same-OOF residual, ADR-0085 §5), so the chosen size is slightly optimistic. The bias
+  direction is conservative — at low test power the rule *stops* pruning rather than
+  over-pruning — and `no_selection_gate` still catches a subset that regresses versus no
+  selection; a fully independent OOF is a Day-2 improvement.
 - **Preprocessing and probability calibration are not part of the ONNX graph.**
   The graph consumes the numeric design matrix: rebuild it from the bundled
   `schema.json` (the categorical ordinal mapping is in

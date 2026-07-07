@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+import io
+
+import joblib
 import numpy as np
 import pytest
+from sklearn.dummy import DummyClassifier, DummyRegressor
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
 
 from honestml.adapters import (
     BaselineClassifier,
@@ -180,3 +186,34 @@ def test_not_fitted_message_is_method_neutral() -> None:
         est.predict_proba(np.zeros((2, 4)))
     with pytest.raises(NotFittedError, match="is not fitted"):
         _ = est.feature_importances
+
+
+def _legacy_baseline_artifact(kind: str, X: np.ndarray, y: np.ndarray) -> object:
+    """A 1.0.0 baseline artifact: the CURRENT class holding the legacy ``Pipeline([SimpleImputer, Dummy])``
+    ``_model`` state (exactly what unpickling a 1.0.0 dump restores), round-tripped through joblib like a load."""
+    dummy = DummyClassifier(strategy="prior") if kind == "clf" else DummyRegressor(strategy="mean")
+    legacy = Pipeline([("imputer", SimpleImputer(strategy="median")), ("dummy", dummy)])
+    legacy.fit(X, y, dummy__sample_weight=None)
+    est = BaselineClassifier() if kind == "clf" else BaselineRegressor()
+    est._model = legacy  # type: ignore[assignment]
+    if kind == "clf":
+        est.classes_ = legacy.classes_  # type: ignore[attr-defined]
+    buf = io.BytesIO()
+    joblib.dump(est, buf)
+    buf.seek(0)
+    return joblib.load(buf)
+
+
+def test_legacy_1_0_0_baseline_artifact_still_predicts() -> None:
+    # F122: a 1.0.0 artifact stored _model as Pipeline([SimpleImputer, Dummy]); ADR-0101 switched 1.1 to a
+    # bare Dummy fed a constant column, so a loaded legacy pickle's imputer got 1 feature and predict raised a
+    # raw sklearn ValueError. The legacy Pipeline must be fed the real X (imputer runs, Dummy prior/mean unchanged).
+    Xc, yc = _xy_binary(n=80)
+    clf = _legacy_baseline_artifact("clf", Xc, yc)
+    prior = np.bincount(yc) / len(yc)
+    assert np.array_equal(clf.predict_proba(Xc), np.tile(prior, (len(yc), 1)))
+    assert clf.predict(Xc).shape == (Xc.shape[0],)
+
+    Xr, yr = _xy_regression(n=80)
+    reg = _legacy_baseline_artifact("reg", Xr, yr)
+    assert np.allclose(reg.predict(Xr), yr.mean())

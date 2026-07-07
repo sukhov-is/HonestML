@@ -57,6 +57,37 @@ def test_pandas_string_reads_without_pyarrow(monkeypatch: pytest.MonkeyPatch) ->
     assert ds.n_rows == 4
 
 
+def test_from_pandas_fallback_parity_with_pyarrow() -> None:
+    # F134: the pyarrow-free column-wise fallback must match pl.from_pandas value-for-value (input
+    # parity is a train<->inference honesty precondition), across nulls in every dtype family.
+    df = pd.DataFrame(
+        {
+            "f": [1.0, np.nan, 3.0, 4.0],  # float + NaN -> null
+            "i": [1, 2, 3, 4],
+            "s": ["a", "b", None, "b"],  # object string + None
+            "nb": pd.array([1, 2, None, 4], dtype="Int64"),  # nullable extension dtype
+            "b": [True, False, True, False],
+            "dt": pd.to_datetime(["2021-01-01", None, "2021-03-01", "2021-04-01"]),  # + NaT
+            "cat": pd.Categorical(["x", "y", "x", None]),
+        }
+    )
+    fallback = Reader._from_pandas_without_pyarrow(df)
+    reference = pl.from_pandas(df)
+    assert list(fallback.columns) == list(reference.columns) == list(df.columns)
+    assert fallback.height == reference.height == len(df)
+    for col in df.columns:
+        # value parity (to_list normalizes dtype): categorical surfaces as String in the fallback — a
+        # documented, harmless dtype divergence — but the values still match
+        assert fallback[col].to_list() == reference[col].to_list(), col
+
+
+def test_from_pandas_fallback_converts_array_like_cells() -> None:
+    # F132: an object column of list/array cells must convert like the pyarrow path, never a bare
+    # ValueError ("truth value of an array is ambiguous") from a per-element pd.isna.
+    out = Reader._from_pandas_without_pyarrow(pd.DataFrame({"o": [[1, 2], [3], None, [4, 5]]}))
+    assert out["o"].to_list() == [[1, 2], [3], None, [4, 5]]
+
+
 def test_all_null_target_rejected() -> None:
     with pytest.raises(SchemaValidationError, match="all-null"):
         Reader(Task(kind="binary")).read(

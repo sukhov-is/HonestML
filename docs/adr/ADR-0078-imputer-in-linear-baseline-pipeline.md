@@ -21,7 +21,9 @@ Finding #5 уже ввёл паттерн `Pipeline([StandardScaler, model])` в
 ### 1. Импьютер впереди Pipeline линейных и baseline
 `Linear{Classifier,Regressor}` и `Baseline{Classifier,Regressor}` ([estimators.py](../../src/honestml/adapters/estimators.py)) строят
 `Pipeline([("imputer", SimpleImputer(strategy="median")), ("scaler", StandardScaler()), (model)])`
-(baseline — `Pipeline([SimpleImputer, Dummy])`, без scaler). Импьютер **фитится по фолду** на `fit_idx` (Pipeline строится в `factory()` и фитится на срезе train) → **leak-free**, как уже работает scaler. На данных без NaN — no-op (медианы посчитаны, но не применяются).
+(baseline — `Pipeline([SimpleImputer, Dummy])`, без scaler; **для baseline superseded by ADR-0101 §2**:
+перешёл на Dummy-passthrough без импьютера — предсказания бит-идентичны, механизм NaN-стойкости другой).
+Импьютер **фитится по фолду** на `fit_idx` (Pipeline строится в `factory()` и фитится на срезе train) → **leak-free**, как уже работает scaler. На данных без NaN — no-op (медианы посчитаны, но не применяются).
 - `median` (робастна, sklearn-стандарт); индикатор пропусков **не добавляется** (минимализм; меняет ширину матрицы/схему).
 - `feature_importances` читает `_fitted()[-1].coef_` — последний шаг по-прежнему модель, без изменений.
 

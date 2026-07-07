@@ -40,6 +40,17 @@ def _const_x(n: int) -> np.ndarray:
     return np.zeros((n, 1))
 
 
+def _baseline_input(model: object, X: np.ndarray) -> np.ndarray:
+    """The matrix a fitted baseline's ``predict`` must receive (F122, artifact back-compat within MAJOR 1).
+
+    A 1.1 baseline is a bare ``Dummy`` fit on a constant column (ADR-0101), so the real ``X`` is
+    irrelevant -> feed the constant stand-in. A **1.0.0 artifact** stored a
+    ``Pipeline([SimpleImputer, Dummy])`` fit on the real matrix; its imputer validates the feature count,
+    so the legacy pickle must be fed ``X`` (the imputer runs, the Dummy still ignores it, prior/mean unchanged).
+    """
+    return X if isinstance(model, Pipeline) else _const_x(X.shape[0])
+
+
 class BaselineClassifier:
     """Prior-frequency baseline (sklearn ``DummyClassifier(strategy="prior")``)."""
 
@@ -65,10 +76,12 @@ class BaselineClassifier:
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        return self._fitted().predict(_const_x(X.shape[0]))
+        model = self._fitted()
+        return model.predict(_baseline_input(model, X))
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        return self._fitted().predict_proba(_const_x(X.shape[0]))
+        model = self._fitted()
+        return model.predict_proba(_baseline_input(model, X))
 
     def _fitted(self) -> DummyClassifier:
         if self._model is None:
@@ -99,7 +112,8 @@ class BaselineRegressor:
         return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        return self._fitted().predict(_const_x(X.shape[0]))
+        model = self._fitted()
+        return model.predict(_baseline_input(model, X))
 
     def _fitted(self) -> DummyRegressor:
         if self._model is None:

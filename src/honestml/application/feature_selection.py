@@ -84,12 +84,17 @@ def _refine_steps(fs: FeatureSelectionConfig, n_features: int) -> int:
         k0 = max(1, math.ceil(fs.top_frac * n_features))
     else:  # auto
         k0 = n_features
+    # apply_cutoff raises the survivor set to the min_features floor, so the trajectory starts from that
+    # many features (F127: keeps the estimate a true upper bound when min_features > the cutoff size)
+    k0 = max(k0, min(max(1, fs.min_features), n_features))
     floor = max(1, fs.seq_min_features)
     steps = 1  # trajectory[0]: the uncapped survivor set
     cur = k0
-    if fs.refine_max_features is not None and cur > fs.refine_max_features:
-        cur = fs.refine_max_features
-        steps += 1
+    if fs.refine_max_features is not None:
+        cap = max(fs.refine_max_features, floor)  # F126: the cap never truncates below the descent floor
+        if cur > cap:
+            cur = cap
+            steps += 1
     while cur > floor:
         cur -= min(max(1, math.ceil(cur * fs.refine_drop_frac)), cur - floor)
         steps += 1
@@ -247,14 +252,35 @@ def refine_trajectory(
     order = [int(i) for i in np.argsort(-agg, kind="stable") if int(i) in members]
     trajectory: list[tuple[int, ...]] = [tuple(sorted(order))]
     current = order
-    if max_features is not None and len(current) > max_features:
-        current = current[:max_features]
-        trajectory.append(tuple(sorted(current)))
+    if max_features is not None:
+        cap = max(max_features, floor)  # F126: the cap never truncates below the descent floor
+        if len(current) > cap:
+            current = current[:cap]
+            trajectory.append(tuple(sorted(current)))
     while len(current) > floor:
         drop = min(max(1, math.ceil(len(current) * drop_frac)), len(current) - floor)
         current = current[:-drop]
         trajectory.append(tuple(sorted(current)))
     return tuple(trajectory)
+
+
+def mass_floor(agg: np.ndarray, refine_min_mass: float) -> int:
+    """Smallest feature count covering ``refine_min_mass`` of the stage-1 importance mass (ADR-0104).
+
+    Insurance against proxy-blindness: the cascade descent never prunes below the ``k`` strongest
+    features whose cumulative (non-negative) ``agg`` mass reaches ``refine_min_mass``. Zero extra fits
+    (``agg`` already computed). Signed rankers give negative margins that carry no signal mass, so the
+    mass is over ``clip(agg, 0)``; ``0`` when disabled (``<= 0``) or there is no positive mass. A small
+    tolerance at the crossing keeps ``searchsorted`` platform-stable (deterministic by construction).
+    """
+    if refine_min_mass <= 0.0:
+        return 0
+    pos = np.clip(agg, 0.0, None)
+    total = float(pos.sum())
+    if total == 0.0:
+        return 0
+    frac = np.sort(pos)[::-1].cumsum() / total
+    return int(np.searchsorted(frac, refine_min_mass - 1e-12) + 1)
 
 
 def apply_cutoff(

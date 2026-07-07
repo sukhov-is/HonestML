@@ -25,6 +25,24 @@ All notable changes to this project are documented here. The format follows
 - Run-report `hpo` block gains `tuned_on: "fs_subset" | "dev_full"` (ADR-0102).
 
 ### Changed
+- **Adaptive cascade sizing — the refinement size rule is now power-adaptive (ADR-0103/0104/0105):**
+  the two-stage cascade no longer over-prunes to the floor when the significance test has low power
+  (small/noisy data, or a proxy that cannot tell subsets apart). Two new `FeatureSelectionConfig`
+  knobs, **on by default**: `refine_tol` (default `0.01`) turns the size rule from two-sided
+  equivalence into one-sided **non-inferiority** — a more compact trajectory point is accepted only if
+  its lower confidence bound is within `refine_tol·|best|` of the anchor, so a wide CI now *stops*
+  pruning instead of accepting everything; `refine_min_mass` (default `0.99`) adds a **mass floor** —
+  the descent never prunes below the features covering that share of the stage-1 importance, insurance
+  against proxy-blindness. The cascade floor is unified to
+  `max(min_features, seq_min_features, mass_floor)` (`min_features` was previously ignored by the
+  cascade). The same non-inferiority rule guards the no-selection gate. Both knobs are neutralised by
+  `0` (`refine_tol=0` → two-sided as before; `refine_min_mass=0` → no mass floor). New port method
+  `SignificanceTest.noninferior` reuses the existing bootstrap distribution (no new RNG pass;
+  deterministic). The run-report `feature_selection.refine` block gains `floor`, `floor_source`,
+  `refine_tol`, `refine_min_mass`. **Results and the run-fingerprint change for every ranker-cascade
+  FS run** (new config fields in the dump → caches recompute cold). *Known limitation:* the mass floor
+  is a heuristic over the estimator-agnostic importance, not a guarantee; the leader-family trajectory
+  scoring that fully cures proxy-blindness is a Day-2 item.
 - **Feature selection defaults change results:** `refine=True` is the new default for ranker FS
   strategies — selected subsets (typically far smaller), leaderboards and shipped models change
   for every `fs=`-enabled run; `refine=False` restores pre-1.1 selection exactly. The
@@ -53,6 +71,23 @@ All notable changes to this project are documented here. The format follows
   pairwise test, deltas byte-identical).
 
 ### Fixed
+- **Baseline models saved by 1.0.0 stay loadable and predict (F122):** the bit-neutral perf batch
+  (ADR-0101) changed the baseline's stored `_model` from a `Pipeline([SimpleImputer, Dummy])` to a
+  bare `Dummy` fed a constant column, so a 1.0.0 artifact carrying a baseline (Occam tie-break on a
+  weak signal, or a blended ensemble with a baseline member) loaded but raised a raw sklearn
+  `ValueError` on `predict`/`predict_proba`. The baseline now detects the legacy pipeline state and
+  feeds it the real `X`, keeping artifacts loadable within the same MAJOR series (no
+  `ARTIFACT_VERSION` bump needed).
+- **Nested / per-fold FS arbitration no longer inverts on lower-is-better metrics
+  (regression present since 1.0.0):** for a loss metric (`rmse` — the regression default,
+  `log_loss` — the multiclass default) the `nested` / `nested_per_fold` arbiters ranked the
+  strategy leaderboard on the scorer's sign-flipped (higher-is-better) score without flipping it
+  back to the metric's own orientation, so the significance-band anchor was the **worst**
+  strategy and — with `significance="off"` or any genuinely distinguishable pair — the arbiter
+  deterministically shipped it. The score is now flipped back before building the band
+  candidates, exactly like the sequential band and the no-selection gate. Only affected
+  `arbitration="nested" | "nested_per_fold"` (`"auto"` resolves there for `n < 20000`); the
+  default `arbitration="holdout"` was never affected.
 - **Feature selection no longer crashes on NaN in numeric features:** the estimator-agnostic
   ranker-model (ExtraTrees) and the arbitration/gate/sequential scorer median-impute per call
   from TRAIN statistics (test rows filled with train medians — leak-free; an all-NaN column

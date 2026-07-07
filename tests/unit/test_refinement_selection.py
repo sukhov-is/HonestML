@@ -194,6 +194,10 @@ def test_band_scheme_unchanged_non_ts() -> None:
             seen.append(block_index)
             return True
 
+        def noninferior(self, pa, pb, yt, *, alpha, margin, block_index=None, sample_weight=None):
+            seen.append(block_index)
+            return True
+
     _run(y, est, selection="refinement", significance=_RecSig())
     assert seen and all(b is None for b in seen)  # i.i.d. row bootstrap, never fold-block
 

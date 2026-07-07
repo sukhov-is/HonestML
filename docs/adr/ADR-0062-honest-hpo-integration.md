@@ -1,6 +1,6 @@
 # ADR-0062 — Честная интеграция HPO (inner-CV objective, внешняя селекция, бюджет, `HPOConfig`)
 
-- **Статус:** Accepted (M7, design-gate pending)
+- **Статус:** Accepted (M7, design-gate pending) · **§2a/§7 (`tuned_on_full_feature_space`) superseded by ADR-0102** (tune-on-FS-subset реализован 2026-07-06; inner-objective видит post-FS ширину, флаг пиннится `False`)
 - **Драйвер:** DM-71 (анти-ликедж), DM-74 (стоимость) — FR-HPO-4/5/6; NFR-M7-3/4/5/7
 - **Связано:** ADR-0061 (порт Tuner); ADR-0016/0029 (honest CV / outer_holdout); ADR-0032 (Budget/graceful);
   ADR-0035 (fingerprint); ADR-0057/0058 (паттерн resolve-провенанса/cost-оценки FS); SPIKE-M7-hpo (Q3 cost).
@@ -80,7 +80,7 @@ FS вычисляется **внутри** `run_slice`, итоговый `select
 (`hpo.tuned_on_full_feature_space=true` при `fs!=None`); **tune-on-FS-subset — Day-2** (§Day-2). **Fence
 (R2):** inner-objective использует только `_run_candidate`+TE-шаг (§2), **не** FS-блок — проверка
 `test_tune_estimators::test_inner_objective_sees_full_feature_width` (ширина = full-DEV, не post-FS subset)
-запирает §2a от случайного FS-coupling. Плюс `test_facade::test_hpo_with_fs_tunes_on_full_space_documented`.
+запирает §2a от случайного FS-coupling (после суперсида ADR-0102 сужен до контракта `selected_features=None`).
 
 ### §2b HPO под `run_mode='selection'` (правка по ревью R1; цитата уточнена R2)
 HPO выполняется в **обоих** режимах (`selection` и `full`), чтобы selection-leaderboard отражал тех же тюненых

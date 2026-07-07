@@ -25,6 +25,9 @@ class _AllEquivalent:
     def equivalent(self, pred_a, pred_b, y_true, *, alpha, block_index=None, sample_weight=None):
         return True
 
+    def noninferior(self, pred_a, pred_b, y_true, *, alpha, margin, block_index=None, sample_weight=None):
+        return True
+
 
 def test_argmax_greater_is_better() -> None:
     cands = [Candidate("a", 0.7), Candidate("b", 0.9), Candidate("c", 0.8)]
@@ -91,6 +94,13 @@ def test_select_best_aligns_significance_on_oof_mask() -> None:
             assert len(pred_a) == len(pred_b) == len(y_true)
             return True
 
+        def noninferior(
+            self, pred_a, pred_b, y_true, *, alpha, margin, block_index=None, sample_weight=None
+        ):
+            assert not np.isnan(pred_a).any() and not np.isnan(pred_b).any()
+            assert len(pred_a) == len(pred_b) == len(y_true)
+            return True
+
     a = Candidate("a", 0.9, oof_pred=np.array([np.nan, np.nan, 0.2, 0.8, 0.3, 0.7]), oof_mask=mask)
     b = Candidate("b", 0.8, oof_pred=np.array([np.nan, np.nan, 0.3, 0.7, 0.4, 0.6]), oof_mask=mask)
     best = select_best([a, b], SelectionPolicy(), _AssertClean(), y)
@@ -111,6 +121,13 @@ def test_common_fixed_band_mask() -> None:
 
         def equivalent(
             self, pred_a, pred_b, y_true, *, alpha, block_index=None, sample_weight=None
+        ):
+            seen.append((len(pred_a), len(pred_b), len(y_true)))
+            assert not np.isnan(pred_a).any() and not np.isnan(pred_b).any()
+            return True
+
+        def noninferior(
+            self, pred_a, pred_b, y_true, *, alpha, margin, block_index=None, sample_weight=None
         ):
             seen.append((len(pred_a), len(pred_b), len(y_true)))
             assert not np.isnan(pred_a).any() and not np.isnan(pred_b).any()

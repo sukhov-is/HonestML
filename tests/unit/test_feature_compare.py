@@ -64,6 +64,8 @@ class _FakeDataset:
 
 
 class _FakeSplitter:
+    n_splits = 2  # declared inner fold count for the cost estimate / inner-C5 gate (SupportsNSplits, F139)
+
     def split(self, dataset):
         n = dataset._n
         half = max(1, n // 2)
@@ -176,6 +178,9 @@ def _fit_predict_small(x_tr, y_tr, x_te, sample_weight, random_state):
 def _run_cascade(fit_predict, cfg, *, n=40, n_features=4):
     rng = np.random.RandomState(0)
     x, y = rng.random((n, n_features)), rng.random(n)
+    # neutralize the adaptive-size knobs (ADR-0103/0104) so these tests target the descent/cap/floor
+    # mechanics in isolation; mass-floor and non-inferiority have their own dedicated tests
+    cfg = cfg.model_copy(update={"refine_tol": 0.0, "refine_min_mass": 0.0})
     return compare_features(
         _FakeDataset(n),
         x,
@@ -203,11 +208,15 @@ def test_cascade_refines_to_compact_subset() -> None:
     )
     out = _run_cascade(_fit_predict_small, cfg)
     assert out.winner_idx == (0,)  # strongest stage-1 feature survives to the floor
-    assert out.refine == {
+    assert out.refine == {  # FR-7: the refine block also discloses the effective floor and adaptive knobs
         "n_after_rank": 4,
         "n_after_refine": 1,
         "trajectory_len": 3,  # (0,1,2,3) -> capped (0,1,2) -> (0,)
         "capped": True,
+        "floor": 1,
+        "floor_source": "min_features",
+        "refine_tol": 0.0,
+        "refine_min_mass": 0.0,
     }
 
 
@@ -239,6 +248,24 @@ def test_cascade_respects_floor() -> None:
     assert out.refine is not None and out.refine["n_after_refine"] == 2
 
 
+def test_cascade_respects_min_features_floor() -> None:
+    # FR-4/ADR-0105: min_features (not only seq_min_features) now bounds the cascade descent floor
+    cfg = FeatureSelectionConfig(compare=("importance",), cutoff="top_frac", top_frac=1.0, min_features=3)
+    out = _run_cascade(_fit_predict_small, cfg)
+    assert len(out.winner_idx) == 3  # descent stops at min_features (was ignored by the cascade pre-ADR-0105)
+    assert out.refine is not None and out.refine["floor"] == 3 and out.refine["floor_source"] == "min_features"
+
+
+def test_fs_policy_neutral_and_margin() -> None:
+    # FR-6/ADR-0103: refine_tol=0 -> two-sided (unchanged policy); >0 -> non-inferiority margin_frac
+    from honestml.application.feature_compare import _fs_policy
+
+    pol = SelectionPolicy(greater_is_better=True)
+    assert _fs_policy(pol, _FakeMetric(), 0.0) is pol
+    assert _fs_policy(pol, _FakeMetric(), 0.02).margin_frac == 0.02
+    assert _fs_policy(None, _FakeMetric(), 0.02).margin_frac == 0.02  # None -> derived default policy
+
+
 def test_cascade_runs_per_strategy_in_holdout_compare() -> None:
     # two rankers compete; each runs its own cascade and the winner's refine meta is reported
     rng = np.random.RandomState(0)
@@ -247,6 +274,7 @@ def test_cascade_runs_per_strategy_in_holdout_compare() -> None:
     cfg = FeatureSelectionConfig(
         compare=("importance", "random_probe"), selection_holdout=0.3,
         cutoff="top_frac", top_frac=1.0, refine_drop_frac=0.5,
+        refine_tol=0.0, refine_min_mass=0.0,  # descent-mechanics test: adaptive knobs off (own tests)
     )
     out = compare_features(
         _FakeDataset(n),
@@ -305,11 +333,17 @@ class _AllEquivalent:
     def equivalent(self, a, b, y_true, *, alpha=0.05, block_index=None, sample_weight=None):
         return True
 
+    def noninferior(self, a, b, y_true, *, alpha=0.05, margin=0.0, block_index=None, sample_weight=None):
+        return True
+
 
 class _NoneEquivalent:
     """Inert test (like NoSignificanceTest): nothing is equivalent -> band collapses to argmax."""
 
     def equivalent(self, a, b, y_true, *, alpha=0.05, block_index=None, sample_weight=None):
+        return False
+
+    def noninferior(self, a, b, y_true, *, alpha=0.05, margin=0.0, block_index=None, sample_weight=None):
         return False
 
 
@@ -666,6 +700,58 @@ def test_per_fold_purged_boundary_row_absent_from_reselection_tr() -> None:
     assert not (seen & set(range(20, 40)))  # nor any outer-test row
 
 
+# --- F121: nested/per-fold band anchor orientation on a lower-is-better metric ---
+
+
+class _FakeLossMetric:
+    """Lower-is-better stand-in: ``score == mean(pred)`` read as a loss (rmse/log_loss default orientation)."""
+
+    name = "loss"
+    greater_is_better = False
+    needs = "value"
+    optimum = 0.0
+    average = None
+    proper_proba = False
+
+    def score(self, y_true, y_pred, sample_weight=None):
+        return float(np.mean(y_pred))
+
+
+def _run_loss_arbitration(arbitration, sig_test, *, n=40, n_features=4):
+    # under _fit_predict pred == subset width; with a lower-is-better metric the NARROW subset is the best one
+    rng = np.random.RandomState(0)
+    x, y = rng.random((n, n_features)), rng.random(n)
+    return compare_features(
+        _FakeDataset(n),
+        x,
+        y,
+        task=_FakeTask(),
+        metric=_FakeLossMetric(),
+        strategies=[("good", _FixedSelector("good", (0,))), ("bad", _FixedSelector("bad", (0, 1, 2)))],
+        config=FeatureSelectionConfig(compare=("importance", "random_probe"), arbitration=arbitration),
+        splitter=_FakeSplitter(),
+        carve=_carve,
+        fit_predict=_fit_predict,
+        categorical=np.zeros(n_features, dtype=bool),
+        feature_names=[f"f{i}" for i in range(n_features)],
+        sample_weight=None,
+        random_state=42,
+        arbitration_splitter=_FakeKSplitter(),
+        significance_test=sig_test,
+        policy=SelectionPolicy(greater_is_better=False),
+    )
+
+
+@pytest.mark.parametrize("arbitration", ["nested", "nested_per_fold"])
+def test_arbitration_anchor_orientation_lower_is_better(arbitration) -> None:
+    # F121: the oof scorer emits a higher-is-better (sign-flipped) score; the nested/per-fold band anchor must
+    # be flipped back to the metric's own orientation before ranking with the metric-oriented policy. Before
+    # the fix the anchor was the argMIN of the flipped score (= worst loss), so the arbiter deterministically
+    # shipped the worst strategy. Inert band -> pure argmax: the low-loss "good" subset must win.
+    out = _run_loss_arbitration(arbitration, _NoneEquivalent())
+    assert out.winner == "good" and out.winner_idx == (0,)
+
+
 class _FakeInner5:
     """Inner splitter advertising n_splits=5 (so the inner-C5 gate requires >= 5 rows per class on outer-train)."""
 
@@ -776,7 +862,7 @@ def _kfolds(n: int, k: int = 4) -> list[Fold]:
     ]
 
 
-def _gate(selected_idx, sig, *, n=80):
+def _gate(selected_idx, sig, *, n=80, refine_tol=0.0):
     # the only signal lives in column 0; columns 1..3 are pure noise
     rng = np.random.RandomState(0)
     x = rng.normal(size=(n, 4))
@@ -793,6 +879,7 @@ def _gate(selected_idx, sig, *, n=80):
         significance_test=sig,
         policy=SelectionPolicy(greater_is_better=False),
         random_state=0,
+        refine_tol=refine_tol,
     )
 
 
@@ -812,6 +899,29 @@ def test_gate_noop_when_nothing_dropped() -> None:
     # selecting all features is not a selection -> no gate, no scoring
     keep, reason = _gate((0, 1, 2, 3), _NoneEquivalent())
     assert keep is True and reason == "all_features_selected"
+
+
+class _KeepTwoSidedVetoNI:
+    """Two-sided-equivalent but NOT non-inferior — isolates which membership rule the gate uses."""
+
+    seed = 0
+    n_boot = 0
+
+    def equivalent(self, *a, **k):  # noqa: ANN002, ANN003
+        return True
+
+    def noninferior(self, *a, **k):  # noqa: ANN002, ANN003
+        return False
+
+
+def test_gate_threads_refine_tol_to_noninferiority() -> None:
+    # FR-2/ADR-0103: refine_tol=0 -> two-sided membership (equivalent); refine_tol>0 -> non-inferiority
+    # (noninferior). A fake equivalent-but-not-non-inferior proves the gate switches paths via refine_tol.
+    # (1,2,3) excludes the signal col 0 -> no_selection is the anchor, so the subset's membership is
+    # decided by the rule under test (noninferior) rather than being the always-kept anchor.
+    sig = _KeepTwoSidedVetoNI()
+    assert _gate((1, 2, 3), sig, refine_tol=0.0)[0] is True  # equivalent -> subset kept
+    assert _gate((1, 2, 3), sig, refine_tol=0.05) == (False, "no_selection_better")  # noninferior -> vetoed
 
 
 # --- in-sequential significance band over the trajectory (ADR-0083..0086, FR-1/2/5/6) ---

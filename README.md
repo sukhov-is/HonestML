@@ -42,6 +42,10 @@ Requires Python >= 3.10. Heavy dependencies are optional extras and imported
 lazily — `import honestml` stays light, and a missing extra fails fast with the
 exact `pip install honestml[...]` hint.
 
+The default zoo (`models=None`) is baseline + linear + catboost + lightgbm.
+**xgboost** ships with `[boosting]` but is opt-in (`models=("xgboost", ...)`) — it
+does not earn its CV/HPO budget over catboost/lightgbm on the honesty benchmarks.
+
 ## What you get
 
 | Capability | How |
@@ -51,7 +55,7 @@ exact `pip install honestml[...]` hint.
 | Outer holdout + finalize | `cv=CVConfig(outer_holdout=0.2)`: selection sees only DEV, the holdout is scored once; the shipped model is refit on all data after scoring (`finalize=True`) |
 | Presets | `AutoML(preset="fast" / "balanced" / "best")` — declarative, data-driven partial configs; an explicit argument always wins; honesty parameters are not presettable |
 | Budget + resume | `budget=600` (seconds) or `BudgetConfig(...)` with graceful degradation; `cache="runs/"` resumes by run fingerprint |
-| Feature engineering / selection | OOF-honest target (binary-only) / frequency encoding, datetime deltas, intersections; importance / null-importance / random-probe / sequential / SHAP selection with honest arbitration |
+| Feature engineering / selection | OOF-honest target (binary-only) / frequency encoding, datetime deltas, intersections; importance / null-importance / random-probe / sequential / SHAP selection with an importance-ordered **refinement cascade** (default) and honest arbitration |
 | HPO + ensembling | `hpo=HPOConfig(...)` (Optuna, per-model search before the honest selection); `ensemble=EnsembleConfig()` — a Caruana/weighted blend ships **only if significantly better** |
 | Run report | `model.run_report_` (versioned JSON, tracker-independent); `save_run_report` and `render_report` produce markdown or self-contained HTML (charts via the `report` extra) |
 | Experiment tracking | `tracker="mlflow"` or `TrackerConfig(...)` — post-fit, fail-soft, no global mlflow state; custom backends via the `ExperimentTracker` port |

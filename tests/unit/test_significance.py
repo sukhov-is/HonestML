@@ -31,6 +31,12 @@ class _MeanScore:
         return float(np.average(y_pred, weights=sample_weight))
 
 
+class _MeanLoss(_MeanScore):
+    """Same monotone mean, but lower-is-better -> orientation flips (rmse/log_loss stand-in)."""
+
+    greater_is_better = False
+
+
 def test_delta_distribution_ignores_uncovered_rows() -> None:
     """F104: rows with the uncovered id -1 never form a bootstrap block, so their values cannot
     influence the delta distribution (mirrors the period path's -1 guard)."""
@@ -324,3 +330,76 @@ def test_period_drops_single_class_block(caplog: pytest.LogCaptureFixture) -> No
     with caplog.at_level(logging.WARNING, logger="honestml"):
         verdict = test.equivalent(pred, pred.copy(), y, alpha=0.05, block_index=block_index)
     assert isinstance(verdict, bool)  # the single-class block did not crash the test
+
+
+# --- ADR-0103: one-sided non-inferiority (F143) -----------------------------
+
+
+@pytest.mark.parametrize("metric_cls", [_MeanScore, _MeanLoss])
+def test_noninferior_orientation_knife_edge(metric_cls) -> None:
+    # R-1 knife-edge: a genuinely worse candidate is NOT non-inferior; an ~equal one IS — on BOTH a
+    # higher-is-better (_MeanScore) and a lower-is-better (_MeanLoss) metric (no mirrored sign). The
+    # reference is the anchor (best): high mean for a score, low mean for a loss — so `worse` is the
+    # low mean for a score but the HIGH mean for a loss (flipped by orientation, which the test asserts).
+    metric = metric_cls()
+    rng = np.random.default_rng(0)
+    n = 400
+    y = np.zeros(n)
+    hi, lo = 0.5, 0.3
+    ref_level, worse_level = (hi, lo) if metric.greater_is_better else (lo, hi)
+    ref = ref_level + rng.normal(0.0, 0.015, n)  # the anchor (best)
+    worse = worse_level + rng.normal(0.0, 0.015, n)  # genuinely worse by 0.2 in the metric's direction
+    equal = ref_level + rng.normal(0.0, 0.015, n)  # same level as the anchor
+    sig = BootstrapSignificanceTest(metric=metric, n_boot=2000, seed=0)
+    margin = 0.01 * abs(float(np.mean(ref)))
+    assert not sig.noninferior(worse, ref, y, alpha=0.05, margin=margin)  # worse -> rejected
+    assert sig.noninferior(equal, ref, y, alpha=0.05, margin=margin)  # equivalent -> accepted
+
+
+def test_noninferior_reuses_same_delta_distribution() -> None:
+    # NFR-2: non-inferiority draws the SAME bootstrap deltas as equivalent (same seed, no new RNG pass)
+    rng = np.random.default_rng(0)
+    n = 200
+    y = np.zeros(n)
+    a, b = rng.normal(0.4, 0.1, n), rng.normal(0.5, 0.1, n)
+    sig = BootstrapSignificanceTest(metric=_MeanScore(), n_boot=1000, seed=0)
+    raw = sig._delta_distribution(a, b, y, None, None)
+    finite = sig._finite_deltas(a, b, y, alpha=0.05, block_index=None, sample_weight=None)
+    assert np.array_equal(finite, raw[np.isfinite(raw)])
+
+
+def test_noninferior_degenerate_constant_delta() -> None:
+    # identical predictions -> constant (zero) delta -> improvement 0 >= -margin -> non-inferior
+    n = 100
+    const = np.full(n, 0.5)
+    sig = BootstrapSignificanceTest(metric=_MeanScore(), n_boot=1000, seed=0)
+    assert sig.noninferior(const, const, np.zeros(n), alpha=0.05, margin=0.001)
+
+
+def test_no_significance_noninferior_is_false() -> None:
+    from honestml.core.ports.significance import NoSignificanceTest
+
+    z = np.zeros(3)
+    assert NoSignificanceTest().noninferior(z, z, z, alpha=0.05, margin=1.0) is False
+
+
+def test_noninferiority_band_stops_prune_at_low_power() -> None:
+    # FR-1/ADR-0103: at LOW power (wide CI) the two-sided band INCLUDES a worse compact candidate (the
+    # over-prune), but the non-inferiority band EXCLUDES it (stops pruning) — the core adaptive fix.
+    from honestml.core.selection_policy import Candidate, SelectionPolicy, equivalence_band
+
+    rng = np.random.default_rng(0)
+    n = 30
+    y = np.zeros(n)
+    mask = np.ones(n, dtype=bool)
+    anchor_oof = 0.55 + rng.normal(0.0, 0.4, n)  # wide noise -> low test power
+    worse_oof = 0.50 + rng.normal(0.0, 0.4, n)  # slightly worse in the population
+    anchor = Candidate("anchor", 0.55, n_features=10, oof_pred=anchor_oof, oof_mask=mask)
+    worse = Candidate("worse", 0.50, n_features=2, oof_pred=worse_oof, oof_mask=mask)
+    sig = BootstrapSignificanceTest(metric=_MeanScore(), n_boot=2000, seed=0)
+    two_sided = equivalence_band([anchor, worse], SelectionPolicy(), sig, y).member_ids
+    non_inferior = equivalence_band(
+        [anchor, worse], SelectionPolicy(margin_frac=0.01), sig, y
+    ).member_ids
+    assert "worse" in two_sided  # can't distinguish -> two-sided over-prunes (keeps the compact worse one)
+    assert "worse" not in non_inferior  # wide CI -> lower bound << -margin -> non-inferiority excludes it

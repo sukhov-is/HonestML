@@ -44,6 +44,7 @@ from .slice import (
     _fold_index,
     _run_candidate,
     design_matrix,
+    project_by_name,
 )
 
 # name -> tuned EstimatorFactory builder (closes over registry/task/seed in composition, ADR-0062 §2)
@@ -125,8 +126,7 @@ def tune_estimators(
     # full-width matrix) and by NAME in schema.features order — the same rule design_matrix applies —
     # with the routing indices recomputed by the same gate, so CV/refit/HPO routing stays identical (R-3).
     if selected_features is not None:
-        selected_set = set(selected_features)
-        keep = [i for i, f in enumerate(feature_names) if f in selected_set]
+        keep = project_by_name(feature_names, selected_features)
         x_eval = x_eval[:, keep]
         feature_names = [feature_names[i] for i in keep]
         n_features = len(feature_names)

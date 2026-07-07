@@ -55,6 +55,9 @@ class SelectionPolicy(BaseModel):
     greater_is_better: bool = True
     alpha: float = 0.05
     tie_break: tuple[str, ...] = _TIE_BREAK_KEYS
+    # ADR-0103 (FS cascade / no-selection gate only): None -> two-sided equivalence membership (default,
+    # leaderboard/ensemble); a fraction -> one-sided non-inferiority within margin = margin_frac*|anchor.score|.
+    margin_frac: float | None = None
 
 
 @dataclass(frozen=True)
@@ -174,15 +177,30 @@ def _band_members(
     yt = y_true[mask]
     bi = block_index[mask] if block_index is not None else None
     sw = sample_weight[mask] if sample_weight is not None else None
+    margin = policy.margin_frac * abs(anchor.score) if policy.margin_frac is not None else None
     for c in ordered[1:]:
         if c.oof_pred is None:
             continue
         if n_eff < min_rows:  # degenerate common mask -> conservatively include (ADR-0026 §7)
             band.append(c)
             continue
-        if test.equivalent(
-            c.oof_pred[mask], anchor_pred, yt, alpha=policy.alpha, block_index=bi, sample_weight=sw
-        ):
+        # non-inferiority membership (margin set, ADR-0103) vs two-sided equivalence (default)
+        member = (
+            test.noninferior(
+                c.oof_pred[mask],
+                anchor_pred,
+                yt,
+                alpha=policy.alpha,
+                margin=margin,
+                block_index=bi,
+                sample_weight=sw,
+            )
+            if margin is not None
+            else test.equivalent(
+                c.oof_pred[mask], anchor_pred, yt, alpha=policy.alpha, block_index=bi, sample_weight=sw
+            )
+        )
+        if member:
             band.append(c)
     return band
 

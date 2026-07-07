@@ -193,6 +193,18 @@ class _CandidateFailed(Exception):
         super().__init__(f"candidate {name!r} failed: {self.reason}")
 
 
+def project_by_name(feature_names: Sequence[str], selected: Sequence[str]) -> list[int]:
+    """Column indices selecting ``selected`` in ``feature_names`` (schema) order (ADR-0102 §1, FR-FS-7).
+
+    The single post-FS projection rule, shared by :func:`design_matrix` and ``tune_estimators``: keep the
+    columns whose name is selected, ordered by their position in ``feature_names`` (NOT the subset's tuple
+    order), so the HPO objective, the CV matrix and the shipped refit stay column-aligned regardless of how
+    the subset was stored. Leakage-critical — both call sites must project identically, so the rule lives once.
+    """
+    selected_set = set(selected)
+    return [i for i, f in enumerate(feature_names) if f in selected_set]
+
+
 def design_matrix(dataset: Dataset) -> np.ndarray:
     """Model input: numeric block ⊕ categorical codes, in ``schema.features`` order.
 
@@ -211,16 +223,12 @@ def design_matrix(dataset: Dataset) -> np.ndarray:
     if selected is None:
         return full
     features = dataset.schema.features
-    selected_set = set(selected)
-    missing = selected_set - set(features)
+    missing = set(selected) - set(features)
     if missing:
         raise SchemaValidationError(
             f"selected feature {sorted(missing)!r} absent from the design matrix"
         )
-    # project in schema.features order (not the subset's tuple order) so columns stay aligned with
-    # refit's feature_names regardless of how the subset was stored (R-FS-COLDRIFT, FR-FS-7).
-    keep = [i for i, f in enumerate(features) if f in selected_set]
-    return full[:, keep]
+    return full[:, project_by_name(features, selected)]
 
 
 def _wants_oof(significance_test: SignificanceTest | None) -> bool:
@@ -616,6 +624,7 @@ def run_slice(
                 policy=policy,
                 random_state=fs_gate_seed,
                 block_index=block_index,
+                refine_tol=feature_selection.refine_tol,
             )
             if not keep:
                 logger.warning(

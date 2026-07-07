@@ -320,6 +320,25 @@ def test_fs_config_top_k_requires_top_k() -> None:
     assert FeatureSelectionConfig(cutoff="top_k", top_k=5).top_k == 5
 
 
+def test_fsc_refine_tol_and_min_mass_defaults_and_ranges() -> None:
+    # ADR-0103/0104 ON defaults; 0 = neutral (adaptive rule off); ranges validated at the boundary
+    fs = FeatureSelectionConfig()
+    assert (fs.refine_tol, fs.refine_min_mass) == (0.01, 0.99)
+    neutral = FeatureSelectionConfig(refine_tol=0.0, refine_min_mass=0.0)
+    assert (neutral.refine_tol, neutral.refine_min_mass) == (0.0, 0.0)
+    for bad in ({"refine_tol": -0.1}, {"refine_min_mass": 1.5}, {"refine_min_mass": -0.1}):
+        with pytest.raises(ValueError):
+            FeatureSelectionConfig(**bad)  # type: ignore[arg-type]
+
+
+def test_fsc_refine_off_rejects_mass_floor_but_allows_tol() -> None:
+    # dead-config: refine=False disables the refinement stage -> refine_min_mass is inert (rejected);
+    # refine_tol stays live via the no-selection gate (ADR-0103), so it is allowed
+    with pytest.raises(ValueError, match="refine=False"):
+        FeatureSelectionConfig(refine=False, refine_min_mass=0.9)
+    assert FeatureSelectionConfig(refine=False, refine_tol=0.02).refine_tol == 0.02
+
+
 # --- M6c compare config: additive fields + validation (ADR-0046/0049, FR-FSC-1) ---
 
 
@@ -507,6 +526,8 @@ def test_fs_config_fields_pinned() -> None:
         "refine",
         "refine_max_features",
         "refine_drop_frac",
+        "refine_tol",
+        "refine_min_mass",
         "random_state",
     }
 

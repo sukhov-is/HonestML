@@ -28,6 +28,7 @@ from honestml.core import (
     get_logger,
 )
 from honestml.core.ports.significance import NoSignificanceTest, SignificanceTest
+from honestml.core.ports.splitter import SupportsNSplits
 from honestml.core.selection_policy import (
     BandResult,
     Candidate,
@@ -40,6 +41,7 @@ from .feature_selection import (
     aggregate_scores,
     apply_cutoff,
     estimate_fs_refits,
+    mass_floor,
     refine_trajectory,
 )
 from .oof_scorer import (
@@ -115,6 +117,15 @@ def _strategy_fold_seed(name: str, random_state: int, fold_id: int) -> int:
     return int.from_bytes(digest, "big")
 
 
+def _inner_n_splits(splitter: object) -> int:
+    """The inner CV fold count for the cost estimate and inner-C5 gate (ADR-0058), read via role-protocol.
+
+    A single source for both the ``estimate_fs_refits`` multiplier and the per-fold degradation threshold, so
+    they can never diverge (F139). A splitter without ``n_splits`` (holdout) yields one fold -> 1.
+    """
+    return splitter.n_splits if isinstance(splitter, SupportsNSplits) else 1
+
+
 def no_selection_gate(
     x_full: np.ndarray,
     y: np.ndarray,
@@ -129,6 +140,7 @@ def no_selection_gate(
     policy: SelectionPolicy,
     random_state: int,
     block_index: np.ndarray | None = None,
+    refine_tol: float = 0.0,
 ) -> tuple[bool, str]:
     """Honest gate of a feature subset against the no-selection baseline (finding #10, ADR-0063 §5).
 
@@ -178,7 +190,7 @@ def no_selection_gate(
     ]
     band = equivalence_band(
         candidates,
-        policy,
+        _fs_policy(policy, metric, refine_tol),  # ADR-0103: non-inferiority gate (same margin as the cascade)
         significance_test,
         y,
         block_index=block_index,
@@ -299,6 +311,24 @@ def _band_over_trajectory(
     return subset_by_id[band.winner], (band if real else None)
 
 
+def _fs_policy(
+    policy: SelectionPolicy | None, metric: Metric, refine_tol: float
+) -> SelectionPolicy:
+    """FS band policy: one-sided non-inferiority margin (``refine_tol>0``) or the two-sided default (ADR-0103)."""
+    base = policy if policy is not None else SelectionPolicy(greater_is_better=metric.greater_is_better)
+    return base.model_copy(update={"margin_frac": refine_tol}) if refine_tol > 0.0 else base
+
+
+def _floor_source(config: FeatureSelectionConfig, mass_floor_val: int, floor: int) -> str:
+    """Which of {min_features, seq_min_features, mass} bound the cascade floor (FR-7 observability)."""
+    sources = {
+        "min_features": max(1, config.min_features),
+        "seq_min_features": config.seq_min_features,
+        "mass": mass_floor_val,
+    }
+    return max(sources, key=lambda k: sources[k])
+
+
 def _select_one(
     strategy: Strategy,
     x: np.ndarray,
@@ -376,8 +406,11 @@ def _select_one(
         groups=groups,
     )
     subset1 = apply_cutoff(agg, seeded, strategy.auto_threshold(x.shape[1]))
-    floor = max(1, config.seq_min_features)
-    if not config.refine or len(subset1) <= floor:
+    if not config.refine:
+        return subset1, None, None
+    mass_floor_val = mass_floor(agg, config.refine_min_mass)  # ADR-0104: signal-mass insurance
+    floor = max(1, config.min_features, config.seq_min_features, mass_floor_val)  # ADR-0105: unified floor
+    if len(subset1) <= floor:
         return subset1, None, None
     trajectory = refine_trajectory(
         subset1,
@@ -399,7 +432,7 @@ def _select_one(
         global_classes=global_classes,
         groups=groups,
         significance_test=significance_test,
-        policy=policy,
+        policy=_fs_policy(policy, metric, config.refine_tol),  # ADR-0103: non-inferiority on the ranker cascade
     )
     meta: dict[str, object] = {
         "n_after_rank": len(subset1),
@@ -407,6 +440,10 @@ def _select_one(
         "trajectory_len": len(trajectory),
         "capped": config.refine_max_features is not None
         and len(subset1) > config.refine_max_features,
+        "floor": floor,
+        "floor_source": _floor_source(config, mass_floor_val, floor),
+        "refine_tol": config.refine_tol,
+        "refine_min_mass": config.refine_min_mass,
     }
     return subset2, band, meta
 
@@ -472,8 +509,12 @@ def _nested_winner(
                 continue
         per_strategy.append((name, len(idx), score))
         per_std.append((name, float(np.std(fold_scores)) if fold_scores else 0.0))
+        # scorer output is higher-is-better (sign-flipped); flip back to the metric's own orientation
+        # for the metric-oriented policy, exactly like _band_over_trajectory/no_selection_gate (F121)
         candidates.append(
-            Candidate(id=name, score=score, n_features=len(idx), oof_pred=oof_vec, oof_mask=mask)
+            Candidate(
+                id=name, score=sign * score, n_features=len(idx), oof_pred=oof_vec, oof_mask=mask
+            )
         )
         by_name[name] = idx
     result = equivalence_band(
@@ -547,7 +588,7 @@ def _score_procedure(
     classes, positive, need_proba, sign = _scorer_setup(
         task, metric, y, global_classes=global_classes
     )
-    inner_n_splits = int(getattr(inner_splitter, "n_splits", 2))
+    inner_n_splits = _inner_n_splits(inner_splitter)
     oof_proba = (
         np.full((n, classes.size), np.nan)
         if multiclass and classes is not None
@@ -684,6 +725,7 @@ def _per_fold_winner(
     the compactness of the same object it scored. ``None`` if any strategy is per-fold-infeasible (caller
     degrades the whole arbitration to holdout). The shipped subset is re-derived on full DEV by the caller.
     """
+    sign = 1.0 if metric.greater_is_better else -1.0
     candidates: list[Candidate] = []
     per_strategy: list[tuple[str, int, float]] = []
     per_mean: list[tuple[str, float]] = []
@@ -721,8 +763,10 @@ def _per_fold_winner(
         per_strategy.append((name, n_key, score))
         per_mean.append((name, mean_size))
         subsets_by_name[name] = subsets
+        # scorer output is higher-is-better (sign-flipped); flip back to the metric's own orientation
+        # for the metric-oriented policy, exactly like _band_over_trajectory/no_selection_gate (F121)
         candidates.append(
-            Candidate(id=name, score=score, n_features=n_key, oof_pred=oof_vec, oof_mask=mask)
+            Candidate(id=name, score=sign * score, n_features=n_key, oof_pred=oof_vec, oof_mask=mask)
         )
     band = equivalence_band(
         candidates, policy, significance_test, y, block_index=groups, sample_weight=sample_weight
@@ -882,7 +926,7 @@ def _compare_per_fold(
     Re-selects the subset INSIDE each outer fold (cost ~ N*K_outer SELECTIONS, not just scoring); the winner
     is the strategy whose procedure generalizes best, its subset then re-derived on full DEV.
     """
-    inner_n = int(getattr(ctx.splitter, "n_splits", 5))  # type: ignore[attr-defined]
+    inner_n = _inner_n_splits(ctx.splitter)
     # canonical cost (ADR-0058 §1): the single numeric source, same as the cost-budget gate
     n_refits = estimate_fs_refits(
         ctx.config,

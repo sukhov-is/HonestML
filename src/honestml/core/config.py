@@ -239,6 +239,19 @@ class FeatureSelectionConfig(BaseModel):
         lt=1.0,
         description="fraction of the current subset dropped per refinement step",
     )
+    # adaptive size (ADR-0103/0104): power-adaptive non-inferiority margin + importance-mass floor,
+    # so the cascade stops over-pruning at low test power. 0 disables each (= pre-adaptive behaviour).
+    refine_tol: float = Field(
+        default=0.01,
+        ge=0.0,
+        description="non-inferiority tolerance for cascade size (fraction of |best|); 0 = two-sided band",
+    )
+    refine_min_mass: float = Field(
+        default=0.99,
+        ge=0.0,
+        le=1.0,
+        description="stage-1 importance mass the cascade floor must cover; 0 = mass-floor disabled",
+    )
     random_state: int | None = Field(default=None, description="None -> inherits RunConfig.seed")
 
     @model_validator(mode="after")
@@ -254,11 +267,13 @@ class FeatureSelectionConfig(BaseModel):
             raise ValueError(
                 "null_block_mode='time_window' requires null_block_window (the Δt window width)"
             )
-        # dead-config (ADR-0100): the refine_* knobs only act when the refinement stage runs
-        if not self.refine and {"refine_max_features", "refine_drop_frac"} & self.model_fields_set:
+        # dead-config (ADR-0100/0104): these knobs only act inside the refinement stage. refine_tol is
+        # NOT here — it also drives the no-selection gate (ADR-0103), which runs regardless of refine.
+        refine_knobs = {"refine_max_features", "refine_drop_frac", "refine_min_mass"}
+        if not self.refine and refine_knobs & self.model_fields_set:
             raise ValueError(
                 "refine=False disables the refinement stage; drop refine_max_features/"
-                "refine_drop_frac or set refine=True"
+                "refine_drop_frac/refine_min_mass or set refine=True"
             )
         return self
 

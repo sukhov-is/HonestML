@@ -41,6 +41,27 @@ class SignificanceTest(Protocol):
         sample_weight: np.ndarray | None = None,
     ) -> bool: ...
 
+    def noninferior(
+        self,
+        pred_a: np.ndarray,
+        pred_b: np.ndarray,
+        y_true: np.ndarray,
+        *,
+        alpha: float,
+        margin: float,
+        block_index: np.ndarray | None = None,
+        sample_weight: np.ndarray | None = None,
+    ) -> bool:
+        """Whether ``pred_a`` is non-inferior to ``pred_b`` within an absolute ``margin`` (ADR-0103).
+
+        One-sided companion to :meth:`equivalent`: ``pred_a`` (candidate) is non-inferior to ``pred_b``
+        (reference) when the lower one-sided ``(1-alpha)`` bound of the metric improvement of ``pred_a``
+        over ``pred_b``, oriented to the metric's better direction, is ``>= -margin``. Powers the
+        power-adaptive cascade size rule (low power -> deep lower bound -> stop pruning). ``margin >= 0``
+        is absolute metric units (the caller passes ``margin_frac * |score(anchor)|``).
+        """
+        ...
+
 
 class NoSignificanceTest:
     """The significance opt-out: nothing is equivalent, so the band is empty."""
@@ -55,6 +76,19 @@ class NoSignificanceTest:
         y_true: np.ndarray,
         *,
         alpha: float = 0.05,
+        block_index: np.ndarray | None = None,
+        sample_weight: np.ndarray | None = None,
+    ) -> bool:
+        return False
+
+    def noninferior(
+        self,
+        pred_a: np.ndarray,
+        pred_b: np.ndarray,
+        y_true: np.ndarray,
+        *,
+        alpha: float = 0.05,
+        margin: float = 0.0,
         block_index: np.ndarray | None = None,
         sample_weight: np.ndarray | None = None,
     ) -> bool:

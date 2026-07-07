@@ -964,9 +964,11 @@ def test_fs_on_reduces_features_and_predicts() -> None:
 
 def test_fs_default_cascade_refines_and_reports() -> None:
     # ADR-0100: the default refine=True runs the cascade on a single ranker strategy — the run
-    # report carries the refine block and the subset never exceeds the stage-1 cut
+    # report carries the refine block and the subset never exceeds the stage-1 cut. The adaptive-size
+    # knobs (ADR-0103/0104) are neutralised here so the descent mechanics are exercised; the mass-floor
+    # would otherwise sit above the 3-feature stage-1 cut on 6 features (mass-floor has its own tests).
     X, y = _data()  # 6 numeric features
-    cfg = FeatureSelectionConfig(strategy="importance")  # top_frac=0.5 -> stage-1 keeps 3
+    cfg = FeatureSelectionConfig(strategy="importance", refine_tol=0.0, refine_min_mass=0.0)
     m = AutoML(task="binary", models=("linear",), random_state=0, feature_selection=cfg).fit(X, y)
     fs = m.run_report_["feature_selection"]
     assert m.schema_.selected_features is not None

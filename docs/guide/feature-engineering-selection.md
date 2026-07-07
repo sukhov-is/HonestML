@@ -136,6 +136,25 @@ are normalized and averaged, then `cutoff` turns them into a subset —
 `"top_frac"` (default, keep the strongest 50%), `"top_k"` or `"auto"`, with a
 `min_features` floor.
 
+By default the `cutoff` is only the **first stage**: with `refine=True` (the
+default) each ranker strategy then runs a **cascade** — starting from the cutoff
+survivors it descends an importance-ordered backward trajectory (dropping
+`refine_drop_frac` of the remaining features per step) and picks the size with a
+**power-adaptive** rule (disclosed as `seq_band`/`refine` in the report). A more
+compact point is kept only when it is **non-inferior** to the best point on the
+trajectory — its bootstrap lower bound stays within `refine_tol` (default `0.01`,
+a fraction of the best score). When the data is small or noisy the test loses
+power, that bound drops, and the descent **stops early instead of collapsing to
+the floor** (the pre-1.1 rule over-pruned exactly there). A **mass floor**
+`refine_min_mass` (default `0.99`) guards the other failure mode: the descent
+never prunes below the features that carry that share of the stage-1 importance,
+so the subset stays honest even when the cheap ranker cannot tell two sizes
+apart. The effective floor is `max(min_features, seq_min_features, mass_floor)`.
+`refine_max_features` (default 200) caps the survivor set the cascade starts
+from; `refine=False` restores the pre-1.1 single-cut behaviour (ship exactly the
+`cutoff` subset), and `refine_tol=0` / `refine_min_mass=0` disable the two
+adaptive guards individually.
+
 `"sequential"` is a different kind of strategy: a greedy wrapper that scores
 whole subsets along a backward trajectory rather than ranking features, so
 `cutoff` does not apply to it — it chooses its own feature count. Under the run's

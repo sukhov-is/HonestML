@@ -230,25 +230,35 @@ def test_per_fold_arbitration_resolves_splitter_and_warns_cost(caplog) -> None:
 
 
 def test_explicit_refine_on_pure_sequential_warns_dead_config(caplog) -> None:
-    # ADR-0100: refine acts on ranker strategies only; explicit refine=True with the pure
-    # sequential wrapper is dead config -> WARNING (the default True must not error there)
+    # ADR-0100 / F129: refine acts on ranker strategies only; ANY explicit refine setting on the pure
+    # sequential wrapper is dead config -> WARNING (the default refine=True must not error there)
     from honestml.core import FeatureSelectionConfig
 
-    with caplog.at_level("WARNING"):
-        build_default_components(
-            Task(kind="binary"),
-            random_state=0,
-            feature_selection=FeatureSelectionConfig(strategy="sequential", refine=True),
-        )
-    assert any("refine=True has no effect" in r.message for r in caplog.records)
-    caplog.clear()
-    with caplog.at_level("WARNING"):
-        build_default_components(
-            Task(kind="binary"),
-            random_state=0,
-            feature_selection=FeatureSelectionConfig(strategy="sequential"),  # default, no warning
-        )
-    assert not any("refine=True has no effect" in r.message for r in caplog.records)
+    def _warnings(fs) -> str:
+        caplog.clear()
+        with caplog.at_level("WARNING"):
+            build_default_components(Task(kind="binary"), random_state=0, feature_selection=fs)
+        return " ".join(r.message for r in caplog.records)
+
+    assert "refine settings (refine) have no effect" in _warnings(
+        FeatureSelectionConfig(strategy="sequential", refine=True)
+    )
+    # F129: an explicit refine_* knob (refine defaulted True) is equally dead and must be diagnosed
+    assert "refine settings (refine_drop_frac) have no effect" in _warnings(
+        FeatureSelectionConfig(strategy="sequential", refine_drop_frac=0.1)
+    )
+    # ADR-0104: refine_min_mass is cascade-only -> dead on the wrapper
+    assert "refine settings (refine_min_mass) have no effect" in _warnings(
+        FeatureSelectionConfig(strategy="sequential", refine_min_mass=0.9)
+    )
+    # ADR-0103: refine_tol also drives the no-selection gate (live for sequential) -> NOT dead-config
+    assert "have no effect for the pure 'sequential'" not in _warnings(
+        FeatureSelectionConfig(strategy="sequential", refine_tol=0.02)
+    )
+    # default (no explicit refine setting) -> no dead-config warning
+    assert "have no effect for the pure 'sequential'" not in _warnings(
+        FeatureSelectionConfig(strategy="sequential")
+    )
 
 
 def test_block_window_at_rank_mode_warns_dead_config(caplog) -> None:
@@ -456,6 +466,15 @@ def test_cost_budget_drops_refine_before_floor_failure(caplog) -> None:
     assert eff.refine is False and eff.arbitration == "holdout"
     assert rec["refine_resolved_from"] == "cost_budget"
     assert any("refine disabled" in r.message for r in caplog.records)
+
+
+def test_cost_budget_pure_sequential_no_false_refine_warning(caplog) -> None:
+    # F128: refine is not in the sequential cost estimate, so dropping it cannot clear the budget; the floor
+    # ConfigError must fire WITHOUT a spurious "refine disabled" WARNING (a false diagnostic before the error).
+    fs = FeatureSelectionConfig(strategy="sequential", cost_budget_refits=10)
+    with caplog.at_level("WARNING"), pytest.raises(ConfigError, match="below the holdout floor"):
+        _resolve(fs, n_rows=500)
+    assert not any("refine disabled" in r.message for r in caplog.records)
 
 
 def test_cost_budget_floor_exceeded_raises() -> None:

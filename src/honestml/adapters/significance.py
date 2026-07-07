@@ -59,6 +59,52 @@ class BootstrapSignificanceTest:
         block_index: np.ndarray | None = None,
         sample_weight: np.ndarray | None = None,
     ) -> bool:
+        finite = self._finite_deltas(
+            pred_a, pred_b, y_true, alpha=alpha, block_index=block_index, sample_weight=sample_weight
+        )
+        if finite.size == 0 or float(np.ptp(finite)) == 0.0:
+            return True  # degenerate / all-NaN CI -> conservatively include (operational §5)
+        lo, hi = np.percentile(finite, [100.0 * alpha / 2.0, 100.0 * (1.0 - alpha / 2.0)])
+        return bool(lo <= 0.0 <= hi)
+
+    def noninferior(
+        self,
+        pred_a: np.ndarray,
+        pred_b: np.ndarray,
+        y_true: np.ndarray,
+        *,
+        alpha: float,
+        margin: float,
+        block_index: np.ndarray | None = None,
+        sample_weight: np.ndarray | None = None,
+    ) -> bool:
+        # one-sided companion (ADR-0103): reuses the SAME finite delta array as equivalent (same seed,
+        # no new RNG pass). _delta = score(pred_b) - score(pred_a), so the metric improvement of pred_a
+        # (candidate) over pred_b (reference), oriented to the metric's better direction, is
+        # improvement = orient * (score(pred_a) - score(pred_b)) = -orient * finite. Non-inferior iff the
+        # lower one-sided (1-alpha) bound of improvement >= -margin.
+        orient = 1.0 if self.metric.greater_is_better else -1.0
+        finite = self._finite_deltas(
+            pred_a, pred_b, y_true, alpha=alpha, block_index=block_index, sample_weight=sample_weight
+        )
+        if finite.size == 0:
+            return False  # no evidence -> conservatively not non-inferior (keep more features)
+        improvement = -orient * finite
+        if float(np.ptp(improvement)) == 0.0:
+            return bool(improvement[0] >= -margin)  # constant delta -> exact
+        return bool(float(np.percentile(improvement, 100.0 * alpha)) >= -margin)
+
+    def _finite_deltas(
+        self,
+        pred_a: np.ndarray,
+        pred_b: np.ndarray,
+        y_true: np.ndarray,
+        *,
+        alpha: float,
+        block_index: np.ndarray | None,
+        sample_weight: np.ndarray | None,
+    ) -> np.ndarray:
+        """Finite bootstrap Δ distribution shared by :meth:`equivalent` and :meth:`noninferior`."""
         if not 0.0 < alpha < 1.0:
             raise ConfigError(f"alpha={alpha!r} must be in the open interval (0, 1)")
         if self.n_boot * alpha < _MIN_TAIL:
@@ -72,11 +118,7 @@ class BootstrapSignificanceTest:
             )
         else:
             deltas = self._delta_distribution(pred_a, pred_b, y_true, sample_weight, block_index)
-        finite = deltas[np.isfinite(deltas)]  # drop resamples the metric could not score (NaN)
-        if finite.size == 0 or float(np.ptp(finite)) == 0.0:
-            return True  # degenerate / all-NaN CI -> conservatively include (operational §5)
-        lo, hi = np.percentile(finite, [100.0 * alpha / 2.0, 100.0 * (1.0 - alpha / 2.0)])
-        return bool(lo <= 0.0 <= hi)
+        return deltas[np.isfinite(deltas)]  # drop resamples the metric could not score (NaN)
 
     def _delta_distribution(
         self,

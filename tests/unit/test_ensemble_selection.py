@@ -39,6 +39,9 @@ class _FakeSig:
     def equivalent(self, a, b, y, *, alpha, block_index=None, sample_weight=None):  # noqa: ANN001
         return self._equivalent
 
+    def noninferior(self, a, b, y, *, alpha, margin, block_index=None, sample_weight=None):  # noqa: ANN001
+        return self._equivalent
+
 
 class _AllOnFirst:
     """A degenerate ensembler: all weight on the first member."""
