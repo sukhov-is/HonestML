@@ -12,13 +12,13 @@ Push в main запускает docs-deploy.yml. Workflow устанавлива
 
 Push тега vX.Y.Z запускает release.yml:
 
-1. Check сверяет тег, версию pyproject.toml и honestml.__version__, принадлежность коммита main и успешный CI на этом SHA.
+1. Check запускает scripts/check_tag_version.py для сверки тега, версии pyproject.toml и honestml.__version__, затем проверяет принадлежность коммита main и успешный CI на этом SHA.
 2. Build создаёт sdist и wheel.
 3. Audit устанавливает wheel с boosting extra в чистое окружение, выполняет pip-audit и создаёт CycloneDX SBOM. Исключения уязвимостей учитываются в audits/pip-audit-ignore.txt с обоснованием, сроком пересмотра и записью CHANGELOG.
 4. Publish загружает пакет на PyPI через OIDC в environment pypi с attestations.
 5. GitHub-release создаёт релиз и прикладывает дистрибутивы и SBOM.
 
-Trusted Publisher на PyPI должен указывать этот репозиторий, release.yml и environment pypi. Правила защиты environment задают требуемых reviewers и ограничения публикации. Эти настройки проверяются отдельно от содержимого workflow.
+Trusted Publisher на PyPI должен указывать этот репозиторий, release.yml и environment pypi. Правила защиты environment (protection rules) задают требуемых reviewers и ограничения публикации. Эти настройки проверяются отдельно от содержимого workflow.
 
 ## Последовательность выпуска
 
