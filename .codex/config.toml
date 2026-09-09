@@ -1,0 +1,5 @@
+[features]
+hooks = true
+
+[shell_environment_policy]
+inherit = "core"

@@ -1,0 +1,9 @@
+[project]
+name = "billing-cli"
+version = "0.4.1"
+description = "CLI для выставления и учёта счетов малого бизнеса"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+billing = "billing.cli:main"

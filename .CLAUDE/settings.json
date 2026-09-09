@@ -1,0 +1,90 @@
+{
+  "env": {
+    "BASH_MAX_TIMEOUT_MS": "3600000",
+    "BASH_DEFAULT_TIMEOUT_MS": "3600000"
+  },
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "PowerShell(powershell -NoProfile -File ops/loop/gates.ps1 *)",
+      "Bash(powershell -NoProfile -File ops/loop/gates.ps1 *)",
+      "PowerShell(powershell -NoProfile -ExecutionPolicy Bypass -File ops/loop/gates.ps1 *)",
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File ops/loop/gates.ps1 *)",
+      "PowerShell(powershell -NoProfile -ExecutionPolicy Bypass -File ops/loop/ralph.ps1 *)",
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File ops/loop/ralph.ps1 *)",
+      "PowerShell(powershell -NoProfile -ExecutionPolicy Bypass -File ops/loop/ralph-codex.ps1 *)",
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File ops/loop/ralph-codex.ps1 *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Task|Agent|PowerShell|Monitor|TaskOutput",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --project \"${CLAUDE_PROJECT_DIR}\" python \"${CLAUDE_PROJECT_DIR}/ops/loop/no_background_in_rounds.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --project \"${CLAUDE_PROJECT_DIR}\" python \"${CLAUDE_PROJECT_DIR}/ops/loop/ruff_check.py\"",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "uv run --project \"${CLAUDE_PROJECT_DIR}\" python \"${CLAUDE_PROJECT_DIR}/ops/loop/ledger_discipline.py\"",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "uv run --project \"${CLAUDE_PROJECT_DIR}\" python \"${CLAUDE_PROJECT_DIR}/ops/loop/implementation_round_guard.py\"",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --project \"${CLAUDE_PROJECT_DIR}\" python \"${CLAUDE_PROJECT_DIR}/ops/loop/ledger_discipline.py\"",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "uv run --project \"${CLAUDE_PROJECT_DIR}\" python \"${CLAUDE_PROJECT_DIR}/ops/loop/implementation_round_guard.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --project \"${CLAUDE_PROJECT_DIR}\" python \"${CLAUDE_PROJECT_DIR}/ops/loop/implementation_round_guard.py\"",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "uv run --project \"${CLAUDE_PROJECT_DIR}\" python \"${CLAUDE_PROJECT_DIR}/ops/loop/lint_imports_gate.py\"",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}
