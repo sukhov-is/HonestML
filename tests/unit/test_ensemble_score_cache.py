@@ -302,13 +302,32 @@ def test_application_handles_mutating_prediction_buffer() -> None:
     assert ensembler.observed == (-metric.score(y, pred), -metric.score(y, changed))
 
 
-def test_failed_score_is_not_cached() -> None:
+@pytest.mark.parametrize("force_value_error", [False, True])
+def test_failed_score_is_not_cached(
+    force_value_error: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    if force_value_error:
+        real_log_loss = metrics.log_loss
+
+        def zero_weight_loss(
+            *args: object, sample_weight: np.ndarray | None = None, **kwargs: object
+        ) -> float:
+            if sample_weight is not None and not np.any(sample_weight):
+                raise ValueError("sample weights must contain a non-zero value")
+            return real_log_loss(*args, sample_weight=sample_weight, **kwargs)
+
+        monkeypatch.setattr(metrics, "log_loss", zero_weight_loss)
     y = np.array([0, 1])
-    scorer = _prepared(LogLoss(), y, np.zeros(2))
+    metric, weights, pred = LogLoss(), np.zeros(2), np.array([0.2, 0.8])
+    with pytest.raises((ZeroDivisionError, ValueError)) as reference:
+        metric.score(y, pred, weights)
+    scorer = _prepared(metric, y, weights)
     with patch.object(metrics, "log_loss", wraps=metrics.log_loss) as public:
         for _ in range(2):
-            with pytest.raises(ZeroDivisionError):
-                scorer(np.array([0.2, 0.8]))
+            with pytest.raises(type(reference.value)) as actual:
+                scorer(pred)
+            assert type(actual.value) is type(reference.value)
+            assert str(actual.value) == str(reference.value)
         assert public.call_count == 2
 
 

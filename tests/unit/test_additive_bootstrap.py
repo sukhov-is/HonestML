@@ -153,18 +153,43 @@ def test_custom_subclass_keeps_its_scorer() -> None:
     np.testing.assert_array_equal(actual, expected)
 
 
-def test_zero_weight_draw_preserves_the_reference_exception() -> None:
+@pytest.mark.parametrize("force_value_error", [False, True])
+def test_zero_weight_draw_preserves_the_reference_exception(
+    force_value_error: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    if force_value_error:
+        real_log_loss = metrics.log_loss
+
+        def zero_weight_loss(
+            *args: object, sample_weight: np.ndarray | None = None, **kwargs: object
+        ) -> float:
+            if sample_weight is not None and not np.any(sample_weight):
+                raise ValueError("sample weights must contain a non-zero value")
+            return real_log_loss(*args, sample_weight=sample_weight, **kwargs)
+
+        monkeypatch.setattr(metrics, "log_loss", zero_weight_loss)
+        monkeypatch.setattr(metrics.sklearn, "__version__", "0.0.0")
     metric = LogLoss(classes=np.arange(3))
     y = np.arange(3)
     a = np.array([[0.8, 0.1, 0.1], [0.2, 0.7, 0.1], [0.2, 0.2, 0.6]])
     b = np.full((3, 3), 1 / 3)
     weights = np.array([1.0, 0.0, 0.0])
-    with pytest.raises(ZeroDivisionError):
-        _reference(metric, a, b, y, weights, None)
-    with pytest.raises(ZeroDivisionError):
-        BootstrapSignificanceTest(metric, seed=9, n_boot=80)._delta_distribution(
+    try:
+        expected = _reference(metric, a, b, y, weights, None)
+    except ZeroDivisionError as reference:
+        with pytest.raises(type(reference)) as actual_error:
+            BootstrapSignificanceTest(metric, seed=9, n_boot=80)._delta_distribution(
+                a, b, y, weights, None
+            )
+        assert type(actual_error.value) is type(reference)
+        assert str(actual_error.value) == str(reference)
+    else:
+        actual = BootstrapSignificanceTest(metric, seed=9, n_boot=80)._delta_distribution(
             a, b, y, weights, None
         )
+        assert np.isnan(expected).any()
+        assert np.isfinite(expected).any()
+        np.testing.assert_array_equal(actual, expected)
 
 
 @pytest.mark.parametrize("metric", [LogLoss(classes=np.arange(3)), Rmse(), Accuracy()])
