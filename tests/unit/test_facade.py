@@ -80,6 +80,15 @@ def test_clone_preserves_params() -> None:
     assert c.get_params() == m.get_params()
 
 
+@pytest.mark.parametrize("models", [("linear",), ("baseline", "linear")])
+def test_run_report_preserves_explicit_model_catalog(models: tuple[str, ...]) -> None:
+    X, y = _data()
+    model = AutoML(task="binary", cv=3, models=models, random_state=0).fit(X, y)
+    report = model.run_report_
+    assert report["config"]["model_types"] == list(models)
+    assert {entry.model_id for entry in model.leaderboard_} == set(models)
+
+
 def test_init_does_not_compute() -> None:
     # sklearn invariant: __init__ stores params verbatim, no fitted attributes
     m = AutoML(task="binary")
@@ -257,7 +266,15 @@ def test_run_report_attr_after_fit() -> None:
     m = AutoML(task="binary", random_state=0).fit(X, y)
     report = m.run_report_
     assert report["winner"] == m.best_model_id_
-    assert set(report["timings"]["run"]) == {"selection", "refit"}  # both stages timed
+    assert set(report["timings"]["run"]) == {
+        "reader",
+        "preparation",
+        "fingerprint",
+        "fs",
+        "selection",
+        "statistics",
+        "refit",
+    }
     assert report["budget"]["mode"] == "none"  # unbounded by default
     assert report["significance"] == "bootstrap"
     json.dumps(report)  # serializable without a tracker (FR-M5-4)

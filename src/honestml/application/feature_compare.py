@@ -12,11 +12,13 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Callable, Sequence
+from contextlib import nullcontext
 from dataclasses import dataclass
 
 import numpy as np
 
 from honestml.core import (
+    BudgetExhaustedError,
     Dataset,
     FeatureRanker,
     FeatureSelectionConfig,
@@ -24,6 +26,7 @@ from honestml.core import (
     FeatureSubsetSelector,
     Fold,
     Metric,
+    RunContext,
     Task,
     get_logger,
 )
@@ -46,6 +49,7 @@ from .feature_selection import (
 )
 from .oof_scorer import (
     FitPredict,
+    OOFSubsetCache,
     _fold_proba,
     _positive_of,
     _score_and_band_vector,
@@ -141,6 +145,8 @@ def no_selection_gate(
     random_state: int,
     block_index: np.ndarray | None = None,
     refine_tol: float = 0.0,
+    subset_cache: OOFSubsetCache | None = None,
+    run_context: RunContext | None = None,
 ) -> tuple[bool, str]:
     """Honest gate of a feature subset against the no-selection baseline (finding #10, ADR-0063 §5).
 
@@ -166,6 +172,9 @@ def no_selection_gate(
         random_state=random_state,
         sample_weight=sample_weight,
         global_classes=np.unique(y) if task.is_classification else None,
+        subset_cache=subset_cache,
+        ctx=run_context,
+        recipe="no_selection_gate",
     )
     # the scorer returns a higher-is-better (sign-flipped) score; multiply back to the metric's own
     # orientation so the band ranks with the metric-oriented policy, exactly like the main leaderboard band.
@@ -216,6 +225,8 @@ def _arbitrate_score(
     sw_fit: np.ndarray | None,
     sw_hold: np.ndarray | None,
     global_classes: np.ndarray | None,
+    run_context: RunContext | None = None,
+    recipe: str | None = None,
 ) -> float:
     """Score one subset on the independent selection-holdout (ADR-0048 §1 п.3).
 
@@ -224,7 +235,12 @@ def _arbitrate_score(
     """
     idx = list(indices)
     positive = _positive_of(task, global_classes)
-    proba, pred, cls = fit_predict(x_fit[:, idx], y_fit, x_hold[:, idx], sw_fit, random_state)
+    with (
+        run_context.fit_attribution(recipe=recipe, fold=0)
+        if run_context is not None
+        else nullcontext()
+    ):
+        proba, pred, cls = fit_predict(x_fit[:, idx], y_fit, x_hold[:, idx], sw_fit, random_state)
     if (
         metric.needs in _PROBA_NEEDS
         and proba is not None
@@ -259,6 +275,9 @@ def _band_over_trajectory(
     groups: np.ndarray | None,
     significance_test: SignificanceTest | None,
     policy: SelectionPolicy | None,
+    subset_cache: OOFSubsetCache | None = None,
+    run_context: RunContext | None = None,
+    recipe: str | None = None,
 ) -> tuple[tuple[int, ...], BandResult | None]:
     """Pick the final subset from a backward trajectory by significance band + Occam (ADR-0083/0085).
 
@@ -285,6 +304,9 @@ def _band_over_trajectory(
         random_state=random_state,
         sample_weight=sample_weight,
         global_classes=global_classes,
+        subset_cache=subset_cache,
+        ctx=run_context,
+        recipe=recipe,
     )
     sign = 1.0 if metric.greater_is_better else -1.0
     n_full = x.shape[1]
@@ -352,6 +374,8 @@ def _select_one(
     groups: np.ndarray | None = None,
     significance_test: SignificanceTest | None = None,
     policy: SelectionPolicy | None = None,
+    subset_cache: OOFSubsetCache | None = None,
+    run_context: RunContext | None = None,
 ) -> tuple[tuple[int, ...], BandResult | None, dict[str, object] | None]:
     """Run one strategy, dispatching by port -> ``(subset, band, refine_meta)`` (ADR-0083/0100).
 
@@ -363,6 +387,7 @@ def _select_one(
     per-row structure label (``block_index`` for the band; structure-aware rankers); already sliced
     to ``x``'s rows by the caller (ADR-0050 §3).
     """
+    subset_cache = subset_cache if subset_cache is not None else OOFSubsetCache()
     if isinstance(strategy, FeatureSubsetSelector):
         score_subset = make_oof_scorer(
             x,
@@ -374,6 +399,9 @@ def _select_one(
             random_state=seed,
             sample_weight=sample_weight,
             global_classes=global_classes,
+            subset_cache=subset_cache,
+            ctx=run_context,
+            recipe=strategy.name,
         )
         trajectory = strategy.select(
             x,
@@ -395,9 +423,12 @@ def _select_one(
             random_state=seed,
             sample_weight=sample_weight,
             global_classes=global_classes,
+            subset_cache=subset_cache,
             groups=groups,
             significance_test=significance_test,
             policy=policy,
+            run_context=run_context,
+            recipe=strategy.name,
         )
         return subset, band, None
     seeded = config.model_copy(update={"random_state": seed})
@@ -410,6 +441,7 @@ def _select_one(
         config=seeded,
         sample_weight=sample_weight,
         groups=groups,
+        ctx=run_context,
     )
     subset1 = apply_cutoff(agg, seeded, strategy.auto_threshold(x.shape[1]))
     if not config.refine:
@@ -438,11 +470,14 @@ def _select_one(
         random_state=seed,
         sample_weight=sample_weight,
         global_classes=global_classes,
+        subset_cache=subset_cache,
         groups=groups,
         significance_test=significance_test,
         policy=_fs_policy(
             policy, metric, config.refine_tol
         ),  # ADR-0103: non-inferiority on the ranker cascade
+        run_context=run_context,
+        recipe=strategy.name,
     )
     meta: dict[str, object] = {
         "n_after_rank": len(subset1),
@@ -473,6 +508,8 @@ def _nested_winner(
     groups: np.ndarray | None,
     significance_test: SignificanceTest,
     policy: SelectionPolicy,
+    subset_cache: OOFSubsetCache | None = None,
+    run_context: RunContext | None = None,
 ) -> tuple[
     str,
     tuple[int, ...],
@@ -498,6 +535,8 @@ def _nested_winner(
         random_state=random_state,
         sample_weight=sample_weight,
         global_classes=global_classes,
+        subset_cache=subset_cache,
+        ctx=run_context,
     )
     sign = 1.0 if metric.greater_is_better else -1.0
     candidates: list[Candidate] = []
@@ -505,7 +544,8 @@ def _nested_winner(
     per_std: list[tuple[str, float]] = []
     by_name: dict[str, tuple[int, ...]] = {}
     for name, idx in subsets:
-        score, oof_vec, mask = scorer(idx)
+        with run_context.fit_attribution(recipe=name) if run_context is not None else nullcontext():
+            score, oof_vec, mask = scorer(idx)
         # per-fold dispersion from the metric-ready OOF (no refit): score each arb fold's slice; a fold the
         # metric cannot score (e.g. a single-class proba slice) is skipped — dispersion is a diagnostic.
         fold_scores: list[float] = []
@@ -578,6 +618,7 @@ def _score_procedure(
     groups: np.ndarray | None,
     significance_test: SignificanceTest | None = None,
     policy: SelectionPolicy | None = None,
+    run_context: RunContext | None = None,
 ) -> (
     tuple[float, np.ndarray, np.ndarray, list[tuple[int, ...]], int, dict[str, float] | None] | None
 ):
@@ -655,13 +696,19 @@ def _score_procedure(
             groups=grp_tr,
             significance_test=significance_test,
             policy=policy,
+            run_context=run_context,
         )
         # per-fold band runs (ADR-0083 §3a) but its BandResult is discarded: seq_band is reported only for
         # the winner's FINAL selection on full DEV (ADR-0086 §1), not for intermediate per-fold re-selections.
         cols = list(idx_f)
-        proba, pred, cls = fit_predict(
-            x_full[tr][:, cols], y[tr], x_full[test_idx][:, cols], sw_tr, random_state
-        )
+        with (
+            run_context.fit_attribution(recipe=name, fold=fold_id)
+            if run_context is not None
+            else nullcontext()
+        ):
+            proba, pred, cls = fit_predict(
+                x_full[tr][:, cols], y[tr], x_full[test_idx][:, cols], sw_tr, random_state
+            )
         oof_pred[test_idx] = pred
         if need_proba and proba is not None and cls is not None and classes is not None:
             oof_proba[test_idx] = _fold_proba(
@@ -715,6 +762,7 @@ def _per_fold_winner(
     groups: np.ndarray | None,
     significance_test: SignificanceTest,
     policy: SelectionPolicy,
+    run_context: RunContext | None = None,
 ) -> (
     tuple[
         str,
@@ -762,6 +810,7 @@ def _per_fold_winner(
             groups=groups,
             significance_test=significance_test,
             policy=policy,
+            run_context=run_context,
         )
         if result is None:
             return None
@@ -820,6 +869,8 @@ class _CompareCtx:
     # in-trajectory band activates everywhere; off -> NoSignificanceTest -> argmax (FR-2).
     significance_test: SignificanceTest | None = None
     policy: SelectionPolicy | None = None
+    subset_cache: OOFSubsetCache | None = None
+    run_context: RunContext | None = None
 
     def select(
         self,
@@ -850,8 +901,10 @@ class _CompareCtx:
                 groups=grp,
                 significance_test=self.significance_test,
                 policy=self.policy,
+                subset_cache=self.subset_cache,
+                run_context=self.run_context,
             )
-        except FeatureSelectionError:
+        except (FeatureSelectionError, BudgetExhaustedError):
             raise
         except Exception as exc:  # fail-fast: no silent strategy drop (ADR-0048 §4 п.4)
             raise FeatureSelectionError(name, exc) from exc
@@ -973,6 +1026,7 @@ def _compare_per_fold(
         groups=ctx.groups,
         significance_test=significance_test,
         policy=policy,
+        run_context=ctx.run_context,
     )
     if pf is None:
         return None
@@ -1052,9 +1106,11 @@ def _compare_nested(
         sample_weight=ctx.sample_weight,
         random_state=ctx.random_state,
         global_classes=ctx.global_classes,
+        subset_cache=ctx.subset_cache,
         groups=ctx.groups,
         significance_test=significance_test,
         policy=policy,
+        run_context=ctx.run_context,
     )
     return _outcome(
         ctx,
@@ -1140,6 +1196,8 @@ def _compare_holdout(
             sw_fit=sw_devfit,
             sw_hold=sw_sel,
             global_classes=ctx.global_classes,
+            run_context=ctx.run_context,
+            recipe=name,
         )
         per_strategy.append((name, len(idx), arb))
         if arb > best_score:  # strict > -> ties keep the first strategy in order (ADR-0048 §1 п.3)
@@ -1175,6 +1233,8 @@ def compare_features(
     arbitration_splitter: object | None = None,
     significance_test: SignificanceTest | None = None,
     policy: SelectionPolicy | None = None,
+    subset_cache: OOFSubsetCache | None = None,
+    run_context: RunContext | None = None,
 ) -> CompareOutcome:
     """Pick one subset by honest compare (ADR-0046 §3 / ADR-0048) — dispatch the arbitration mode.
 
@@ -1205,6 +1265,8 @@ def compare_features(
         # band wiring threaded UNCONDITIONALLY so single-strategy sequential's band activates too (ADR-0083 §3)
         significance_test=significance_test,
         policy=policy,
+        subset_cache=subset_cache if subset_cache is not None else OOFSubsetCache(),
+        run_context=run_context,
     )
     if len(strategies) == 1:
         return _compare_single(ctx, strategies)

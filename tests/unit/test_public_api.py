@@ -21,6 +21,7 @@ EXPECTED_PUBLIC = {
     "NotFittedError",
     "BudgetExhaustedError",
     "FeatureSelectionError",
+    "SearchConfig",
     "RunConfig",
     "CVConfig",
     "BudgetConfig",

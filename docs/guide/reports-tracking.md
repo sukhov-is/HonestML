@@ -36,15 +36,15 @@ print(report["winner"], report["metric"], report["honestml_version"])
 
 ## The run fingerprint
 
-`run_fingerprint` is the reproducibility contract: a hex SHA-256 over canonical
-JSON of everything that can change a candidate's out-of-fold score — the
-resolved config, the task and metric identity, a content digest of the data
-(design matrix, target, row-aligned metadata, schema), the resolved estimator
-set and the installed library versions. Same inputs give the same fingerprint
-and therefore the same selection; the key is fail-closed, so any change to any
-ingredient changes it. It is also the cache key for `cache=`/resume.
-Post-selection observability — `tracker`, `finalize`, report rendering — is
-deliberately outside the fingerprint, because it cannot change the model.
+`run_fingerprint` — SHA-256 канонического вычислительного контекста:
+разрешённая конфигурация, task/metric, данные и метаданные строк, schema,
+каталог моделей и версии библиотек. Он используется для `cache=`/resume.
+Таймауты и ресурсные ограничения могут менять выполненную работу и итог
+при одинаковом fingerprint; он не доказывает равенство результатов.
+
+`tracker`, рендеринг отчёта и `finalize` исключены из fingerprint поиска.
+`finalize` влияет на последующее обучение поставляемой модели, поэтому
+его значение также нужно учитывать при сравнении артефактов.
 
 ```python
 from sklearn.datasets import make_classification

@@ -91,10 +91,15 @@ class CaruanaEnsembler:
                 score(oof[j] if running is None else (running + oof[j]) / (n_sel + 1)) for j in lib
             ]
             pick = int(lib[int(np.argmax(cand))])
-            running = oof[pick].astype(np.float64) if running is None else running + oof[pick]
+            updated: np.ndarray
+            if running is None:
+                updated = oof[pick].astype(np.float64)
+            else:
+                updated = running + oof[pick]
+            running = updated
             n_sel += 1
             counts[pick] += 1
-            s = score(running / n_sel)
+            s = score(updated / n_sel)
             if s > best_score:
                 best_score = s
                 best_counts = counts.copy()

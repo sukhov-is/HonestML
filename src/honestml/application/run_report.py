@@ -21,6 +21,7 @@ invalidator for key-composition changes shipped without a release bump.
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import math
@@ -38,7 +39,7 @@ if TYPE_CHECKING:
     from honestml.core import Dataset, Metric, Task
 
 RUN_MANIFEST_VERSION = 1
-FINGERPRINT_VERSION = 1
+FINGERPRINT_VERSION = 2
 
 # holdout-optimism diagnostic (finding #11c): a holdout better than the winner's OOF by more than this
 # RELATIVE margin signals split dependence (the outer holdout is not independent of DEV). Relative so it
@@ -60,6 +61,7 @@ def build_run_report(
     preset: Mapping[str, Any] | None = None,
     task: str | None = None,
     metric: str | None = None,
+    cost: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Assemble the run report (schema v1 + additive RC keys, JSON primitives only); ADR-0033/0037.
 
@@ -78,8 +80,10 @@ def build_run_report(
         "task": task,
         "metric": metric,
         "config": run_config.model_dump(mode="json"),
-        "timings": timings,
+        "timings": copy.deepcopy(timings),
+        "cost": copy.deepcopy(dict(cost)) if cost is not None else None,
         "winner": result.best_model_id,
+        "search": copy.deepcopy(result.search),
         # per-candidate failures (F4.2): the isolation outcome must be visible in the report,
         # not only in logging (NullHandler by default). [] on a clean run. Additive; version 1.
         "failed": [{"model_id": f.id, "reason": f.reason} for f in result.failed],
@@ -215,6 +219,8 @@ def _feature_selection_report(
         "n_selected": len(fs.selected_features),
         "selected": list(fs.selected_features),
     }
+    if fs.subset_cache is not None:
+        block["subset_cache"] = dict(fs.subset_cache)
     # no-selection honest gate verdict (finding #10): present whenever the gate ran. "no_selection_better"
     # means the subset was dropped and all features shipped — the gate is never silent (ADR-0063 §5).
     if fs.selection_gate is not None:
@@ -296,6 +302,7 @@ def compute_run_fingerprint(
     data_signature: str,
     estimators: Iterable[str],
     lib_versions: Mapping[str, str | None],
+    search_completion: Mapping[str, object] | None = None,
 ) -> str:
     """Deterministic, fail-closed run key — hex SHA-256 over canonical JSON (ADR-0035 §1).
 
@@ -315,6 +322,8 @@ def compute_run_fingerprint(
         "honestml_version": _honestml_version(),
         "fingerprint_version": FINGERPRINT_VERSION,
     }
+    if search_completion is not None:
+        parts["search_completion"] = dict(search_completion)
     return hashlib.sha256(json.dumps(parts, sort_keys=True).encode("utf-8")).hexdigest()
 
 

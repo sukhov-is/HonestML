@@ -116,6 +116,12 @@ AutoML(ensemble=EnsembleConfig())                       # blend shipped only if 
 AutoML(tracker="mlflow")                                # post-fit experiment tracking (mlflow extra)
 ```
 
-`FeatureSelectionConfig`, `HPOConfig`, and `EnsembleConfig` are importable from
-`honestml`. The [API reference](api.md) documents every parameter; the
-[correctness guide](correctness-guide.md) explains the selection contract.
+`FeatureSelectionConfig`, `HPOConfig`, `EnsembleConfig` и `SearchConfig`
+импортируются из `honestml`. `AutoML(search=SearchConfig(...))` включает
+ограниченные пробы семейств, FS и широкий контроль. Это отдельная настройка
+от `preset="fast"`; прямой запуск с пресетом не включает её автоматически.
+
+[Стоимость обучения](training-performance.md) описывает ресурсы подтверждения,
+условный прогноз FS/HPO и повтор с фиксированным семейством. Прогноз не равен
+полному времени fit, а независимая приёмка качества требует заранее заданных
+данных, метрики и допуска. Все параметры приведены в [API](api.md).

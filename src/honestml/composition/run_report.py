@@ -15,16 +15,45 @@ import base64
 import html as _html
 import io
 import json
+import os
+import platform
 from collections.abc import Mapping
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
 
-from honestml.core import ConfigError, get_logger
+from honestml.core import ConfigError, RunContext, get_logger
 
 logger = get_logger("composition.run_report")
 
 _RUN_REPORT_FILE = "run_report.json"
+
+
+def configure_run_cost(ctx: RunContext) -> None:
+    """Attach local environment and optional boundary RSS sampling to a fresh run."""
+    from honestml.application import collect_lib_versions
+
+    ctx.environment = {
+        "python": platform.python_version(),
+        "os": platform.system(),
+        "machine": platform.machine(),
+        "cpu_count": os.cpu_count(),
+        "ram_mb": None,
+        "versions": collect_lib_versions(
+            {"numpy", "polars", "scikit-learn", "catboost", "lightgbm", "xgboost", "optuna"}
+        ),
+    }
+    if find_spec("psutil") is not None:
+        try:
+            import psutil
+        except ImportError:
+            ctx.environment["rss_unavailable_reason"] = "psutil_import_failed"
+            return
+
+        process = psutil.Process()
+        ctx.rss_probe = lambda: process.memory_info().rss / 1024**2
+        ctx.environment["ram_mb"] = psutil.virtual_memory().total / 1024**2
+        ctx.sample_memory()
 
 
 def save_run_report(report: dict[str, Any], path: str | Path, *, overwrite: bool = True) -> Path:
@@ -112,6 +141,24 @@ def _sections(report: Mapping[str, Any]) -> list[tuple[str, list[tuple[str, str]
             ],
         )
     ]
+    cost = report.get("cost") or {}
+    if cost:
+        counts = cost.get("fit_counts") or {}
+        sections.append(
+            (
+                "Training cost",
+                [
+                    ("total_wall_s", _cell(cost.get("total_wall_s"))),
+                    ("attributed_wall_s", _cell(cost.get("attributed_wall_s"))),
+                    ("overhead_s", _cell(cost.get("overhead_s"))),
+                    ("fits attempted", _cell(counts.get("attempted"))),
+                    ("fits completed", _cell(counts.get("completed"))),
+                    ("fits failed", _cell(counts.get("failed"))),
+                    ("sampled_peak_rss_mb", _cell(cost.get("sampled_peak_rss_mb"))),
+                    ("memory_measurement", _cell(cost.get("memory_measurement"))),
+                ],
+            )
+        )
     band = report.get("band") or {}
     if band:
         sections.append(
@@ -254,9 +301,11 @@ def _sections(report: Mapping[str, Any]) -> list[tuple[str, list[tuple[str, str]
 
 
 def _timing_rows(report: Mapping[str, Any]) -> list[tuple[str, float]]:
+    cost = report.get("cost")
+    timings = cost.get("exclusive_timings", {}) if cost else report.get("timings") or {}
     return [
         (f"{group}.{stage}", float(elapsed))
-        for group, stages in (report.get("timings") or {}).items()
+        for group, stages in timings.items()
         for stage, elapsed in stages.items()
     ]
 
@@ -300,7 +349,8 @@ def _render_md(report: Mapping[str, Any]) -> str:
     lines.append("")
     timings = _timing_rows(report)
     if timings:
-        lines += ["## Timings (s)", "", "| stage | elapsed |", "|---|---|"]
+        title = "Exclusive timings (s)" if report.get("cost") else "Timings (s)"
+        lines += [f"## {title}", "", "| stage | elapsed |", "|---|---|"]
         lines += [f"| {_md(stage)} | {_md(_cell(elapsed))} |" for stage, elapsed in timings]
         lines.append("")
     lines += [
@@ -348,7 +398,8 @@ def _render_html(report: Mapping[str, Any]) -> str:
         )
     timings = _timing_rows(report)
     if timings:
-        parts.append("<h2>Timings (s)</h2><table><tr><th>stage</th><th>elapsed</th></tr>")
+        title = "Exclusive timings (s)" if report.get("cost") else "Timings (s)"
+        parts.append(f"<h2>{title}</h2><table><tr><th>stage</th><th>elapsed</th></tr>")
         parts += [f"<tr><td>{e(s)}</td><td>{e(_cell(t))}</td></tr>" for s, t in timings]
         parts.append("</table>")
     config_json = json.dumps(report.get("config") or {}, indent=2)

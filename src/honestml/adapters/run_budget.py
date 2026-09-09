@@ -59,6 +59,7 @@ class RunBudget:
         self._clock = clock
         self._t0: float | None = None
         self._trials_done = 0
+        self._reserved_s = 0.0
         # the RSS probe is built lazily and ONLY when a memory limit is set; an injected probe (tests)
         # needs no psutil. This is the single psutil import point (ADR-0039 §3, fix M4).
         if config.memory_limit_mb is not None and mem_probe is None:
@@ -75,12 +76,21 @@ class RunBudget:
                     baseline,
                 )
 
+    def start(self, *, elapsed_s: float = 0.0) -> None:
+        """Start the clock including already measured preparation."""
+        if self._t0 is None:
+            self._t0 = self._clock() - elapsed_s
+
+    def reserve(self, seconds: float) -> None:
+        """Keep wall-clock headroom outside optional search work."""
+        self._reserved_s = seconds
+
     def time_left(self) -> float:
         if self.mode != "time":
             return float("inf")
         # mode="time" guarantees a numeric budget (BudgetConfig validator, boundary invariant)
         assert self._time_budget_s is not None
-        return self._time_budget_s - (self._clock() - self._start())
+        return self._time_budget_s - self._reserved_s - (self._clock() - self._start())
 
     def consume(self, seconds: float) -> None:
         # trials: count the call as one completed trial (the seconds value is advisory, ignored).

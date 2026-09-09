@@ -1,10 +1,9 @@
 # Presets, budget and resume
 
-How to trade thoroughness for speed without touching the honesty contract: named
-presets fill the config, a budget caps the run, and a cache directory makes the
-second identical `fit` nearly free. Every `python` block on this page is
-**self-contained**: copy any one of them and it runs as-is — and every block is
-executed on each CI run, so the examples cannot rot.
+Пресеты заполняют конфигурацию, бюджет ограничивает необязательную работу,
+кеш переиспользует совместимые завершённые результаты. Подготовка, проверки
+и refit могут выполняться при повторном fit. Примеры Python самодостаточны
+и проверяются в CI.
 
 ## Presets
 
@@ -42,14 +41,15 @@ print(explicit.run_report_["preset"], explicit.run_report_["config"]["cv"]["n_sp
 `BudgetConfig(mode="time", time_budget_s=...)` — or a `BudgetConfig`: `mode` is
 `"none"` (unbounded), `"time"` or `"trials"` (with `n_trials`, the candidate
 count), and an orthogonal `memory_limit_mb` (process RSS, needs the `memory`
-extra) composes with any mode. Enforcement is cooperative and per-candidate: the
-check runs before each candidate starts, the time clock starts at the candidate
-loop (reading the data is not billed), and HPO consumes from the same pool.
-Degradation is graceful — when the budget runs out mid-run the remaining
-candidates are skipped, the best model so far still ships, and the final refit is
-never budget-gated. The outcome lands in `run_report_["budget"]`: the `mode`,
-whether the run was `exhausted`, the `skipped` candidate ids and which axis
-(`exhausted_by`) ended the run.
+extra) composes with any mode.
+
+Ограничение кооперативное: начавшийся native fit не прерывается по жёсткому
+deadline. HPO и выбор кандидатов используют общий бюджет времени; HPO trials
+не расходуют счётчик кандидатов `BudgetConfig.n_trials`. При `SearchConfig`
+часы учитывают уже измеренную подготовку, а `reserve_fraction` резервирует
+время завершения. Final refit не ограничивается этим бюджетом. Если ни один
+кандидат не завершён, результатом может быть `BudgetExhaustedError`.
+В `run_report_["budget"]` раскрыты `mode`, `exhausted`, `skipped`, `exhausted_by`.
 
 ```python
 from sklearn.datasets import make_classification
@@ -71,17 +71,17 @@ print(model.run_report_["budget"])
 
 ## Cache and resume
 
-`cache="some/dir"` turns on a per-candidate result store keyed by the **run
-fingerprint**: a digest of the resolved config, the task and metric identity, the
-estimator set, the compute-stack library versions and a content signature of the
-training data. A second `fit` with all of that identical restores each
-candidate's out-of-fold result instead of retraining it; change anything — a
-row, the seed, a config field, a library version — and the fingerprint changes,
-so a stale hit is impossible (a cold run next to older fingerprints logs that the
-config or the data changed). Reuse is per candidate and every result is written
-durably on completion, so an interrupted run *resumes*: the next `fit` recomputes
-only the remainder. The truthful outcome is in `run_report_["cache"]` —
-`enabled`, the `reused` ids and the `computed` ids.
+`cache="some/dir"` хранит результаты кандидатов по fingerprint разрешённой
+конфигурации, данных, метрики, каталога моделей и версий вычислительного стека.
+Переиспользуются совместимые завершённые записи; пропущенные, повреждённые
+или несовместимые записи пересчитываются. `run_report_["cache"]` раскрывает
+`enabled`, `reused` и `computed`.
+
+Candidate/stage cache имеет формат 2. Отдельный HPO checkpoint формата 2
+сохраняет историю trials с проверкой контекста и совместимости префикса.
+Восстановление подготовки и trials не гарантирует нулевую стоимость следующего
+fit или тот же итог при изменившемся фактическом времени. Каталог кеша должен
+быть доверенным.
 
 ```python
 import tempfile
@@ -104,6 +104,26 @@ print(first.run_report_["cache"]["reused"])  # [] — a cold run computes everyt
 print(second.run_report_["cache"]["reused"])  # both candidates restored from the cache
 print(second.best_model_id_ == first.best_model_id_)
 ```
+
+## Ограниченный поиск
+
+`AutoML(search=SearchConfig(...))` включает отдельный режим поиска;
+`preset="fast"` сам по себе его не включает. Начальные пробы используют
+`max_rows=4096`; не более двух финалистов проходят подтверждение с
+`confirmation_rows=65536`, `confirmation_folds=2`, `confirmation_iterations=256`.
+Лимит строк суммируется по fit/ES/test folds одной семьи. Модельные пробы
+сохраняют исходную ширину; `max_features` относится к FS.
+
+Выбор по стоимости требует подтверждённой парной non-inferiority при
+абсолютном `model_margin` (по умолчанию 0). Условный прогноз включает
+поддержанные FS/HPO и оставшиеся CV/refit, но исключает полное wall-time.
+Если компонент неизвестен, выбор по времени не заменяет лидера по качеству.
+Одно явно разрешённое семейство пропускает модельные и стоимостные пробы;
+одна FS-стратегия без `compare` сохраняет ограничения выбранной процедуры.
+Итогом может стать широкий контроль с исходной фабрикой.
+
+[Стоимость обучения](../training-performance.md) описывает измерения,
+исключённые расходы и границы приёмки точности прогноза.
 
 All three knobs are provenance-first: the preset block, the budget outcome and
 the cache outcome all land in `run_report_` — see the

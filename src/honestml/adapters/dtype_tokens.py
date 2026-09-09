@@ -9,10 +9,12 @@ stay robust across polars repr changes (e.g. ``Utf8`` -> ``String``).
 
 from __future__ import annotations
 
+from typing import TypeAlias
+
 import polars as pl
 
 # a polars dtype as a class (e.g. pl.Int64) or an instance (e.g. series.dtype)
-_DType = pl.DataType | type[pl.DataType]
+_DType: TypeAlias = pl.DataType | type[pl.DataType]
 
 # integer family: the only tokens that trigger value-preserving coercion (int↔float drift)
 _INT_TOKENS: list[tuple[_DType, str]] = [

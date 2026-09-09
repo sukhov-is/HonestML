@@ -100,7 +100,9 @@ class ComponentDescriptor:
 
 
 def _build_baseline(*, task: Task, random_state: int) -> Estimator:
-    return BaselineClassifier() if task.is_classification else BaselineRegressor()
+    if task.is_classification:
+        return BaselineClassifier()
+    return BaselineRegressor()
 
 
 def _build_linear(*, task: Task, random_state: int, **params: Any) -> Estimator:

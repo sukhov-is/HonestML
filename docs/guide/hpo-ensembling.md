@@ -8,16 +8,16 @@ candidate with fixed hyperparameters and ships a single model.
 
 ## Fixed, conservative defaults
 
-By default no hyperparameter depends on your data. When the model zoo includes a
-boosting model, each boosting fit uses **early stopping** (ADR-0080): the `n_es` tail
-carved from every fold's training rows is held out as a validation set, the tree count
-is raised to a generous ceiling and the library stops once validation stops improving.
-The artifact manifest records the real `early_stopping` flag so the choice travels with
-the model. A boosting fit *without* a validation tail (inner-CV HPO, or a fold too small
-to spare one) falls back to a fixed `n_estimators=300` (`iterations` for CatBoost) and
-logs a WARNING that the comparison may favor overfit settings. The linear and baseline
-models are plain sklearn defaults. There is no data-size-driven adaptation of any kind —
-what you see in the leaderboard is the untuned, reproducible baseline of each library.
+Без HPO используются параметры фабрик; часть параметров backend может
+разрешаться автоматически по данным. При наличии validation поддерживаемые
+boosting-модели используют early stopping. Для IID CV ES выделяется внутри
+train; временные схемы используют настроенный хвост. Это относится и к
+внутренним HPO folds: inner-test остаётся оценочной частью.
+
+Явные `n_estimators`/`iterations` задают потолок fit. Без явного значения
+потолок составляет 1000 при ES и 300 без ES. Фактические iterations раскрываются
+в отчёте; refit использует медиану фактических DEV rounds. Поэтому число
+использованных деревьев может отличаться от заданного потолка.
 
 ```python
 from sklearn.datasets import make_classification
@@ -33,17 +33,15 @@ print(model.best_model_id_, model.leaderboard_)
 
 ## Tuning is opt-in: HPOConfig
 
-Passing `hpo=HPOConfig(...)` tunes each tunable model type on an **inner CV of
-the development data, before the outer honest selection** — the tuned candidate
-then competes in the regular leaderboard like any other, so tuning can never
-bypass the selection guarantees. `backend="optuna"` is the only backend and
-needs the `optuna` extra (`pip install "honestml[optuna]"`); `n_trials` is the
-per-model search budget, `inner_cv` the fold count of the tuning objective, and
-`models=None` tunes every selected type that declares a search space (baseline
-and linear declare none). `keep_baseline=True` keeps the untuned factory in the
-leaderboard next to the tuned one; `timeout_s` caps each model's search
-wall-clock but makes the result non-deterministic — disclosed in the run
-report.
+`hpo=HPOConfig(...)` настраивает модели с объявленным пространством параметров
+на внутреннем CV внутри DEV. При включённом FS objective использует выбранные
+признаки; последующая DEV-оценка остаётся оценкой после адаптивного поиска.
+`backend="optuna"` требует extra `optuna`; `n_trials` задаёт предел trials на
+семейство, `inner_cv` — число внутренних folds, `HPOConfig.models=None` — все
+доступные для настройки семейства. В ограниченном поиске HPO работает с
+выбранным семейством. `keep_baseline=True` сохраняет исходную фабрику рядом
+с настроенной. `timeout_s` ограничивает поиск кооперативно и может изменить
+число завершённых trials. Фактическая работа и решения доступны в отчёте.
 
 ```python
 from sklearn.datasets import make_classification
@@ -117,14 +115,15 @@ honest selection, over their out-of-fold predictions — no extra refitting is
 needed to evaluate the recipe. `method="caruana"` (the default) is greedy
 ensemble selection with replacement plus seeded bagging (`size` caps the steps,
 `n_bags` the bagging subsamples); `method="weighted"` solves for simplex
-weights directly; `metric=None` blends on the run metric. The blend ships only
-if it is **significantly better** than the best single model — the same
-bootstrap significance gate selection uses — otherwise the single winner ships,
-and the decision is always disclosed in `run_report_["ensemble"]`: `applied`,
-the `member_ids` and `weights`, the OOF improvement `oof_delta`, and a
-`gate_reason` such as `significant_improvement`, `equivalent_to_best`,
-`worse_than_best` or `degenerate_recipe` (the weight search collapsed onto a
-single member).
+weights directly; `metric=None` blends on the run metric.
+
+Gate сравнивает ансамбль с выбранной опорной одиночной моделью; она может
+отличаться от лидера leaderboard по score. Если её предсказания недоступны,
+опорой становится лучший доступный кандидат по метрике. Ансамбль применяется
+при значимом улучшении относительно этой опоры. `run_report_["ensemble"]`
+содержит `applied`, `member_ids`, `weights`, `oof_delta` и `gate_reason`.
+Holdout применённого ансамбля нельзя автоматически вычитать из DEV score
+опорной модели и называть полученную разность optimism ансамбля.
 
 ```python
 from sklearn.datasets import make_classification

@@ -1,54 +1,31 @@
-# Releasing
+# Выпуск и публикация
 
-Pushing a `v*` tag triggers the release pipeline (`.github/workflows/release.yml`).
-The distribution name is `honestml` (`[project]` in `pyproject.toml`);
-`[project.urls]` points at `github.com/sukhov-is/HonestML`.
+Сайт документации и пакет honestml публикуются независимыми workflows. Сайт размещён на [GitHub Pages](https://sukhov-is.github.io/HonestML/); исходники и workflows — в [репозитории HonestML](https://github.com/sukhov-is/HonestML).
 
-## Pipeline
+## Сайт документации
 
-- **check** — triple version gate `tag == pyproject == honestml.__version__`
-  (`scripts/check_tag_version.py`), then verifies the tagged SHA is on `main`
-  with a green CI run.
-- **build** — builds the sdist and wheel.
-- **audit** — installs the wheel with the `boosting` extra into a clean venv
-  and runs pip-audit over it; a second pip-audit invocation in the same job
-  emits a CycloneDX SBOM. The escape
-  valve for a CVE without a released fix is `audits/pip-audit-ignore.txt`:
-  every entry lands via PR with a justification, a review-by date, and a
-  CHANGELOG line.
-- **publish** — uploads to PyPI via trusted publishing (OIDC) from the `pypi`
-  environment; attestations are generated automatically.
-- **github-release** — creates the GitHub Release with auto-generated notes
-  and attaches the distribution files and the SBOM.
+Push в main запускает docs-deploy.yml. Workflow устанавливает зависимости документации, выполняет `mkdocs build --strict`, создаёт `llms.txt` и `llms-full.txt` скриптом `scripts/build_llms_txt.py`, затем публикует site через GitHub Pages. Доступен также ручной workflow_dispatch. Публикация сайта сама по себе не выпускает пакет PyPI и не подтверждает прохождение CI библиотеки.
 
-## One-time setup (prerequisites)
+В настройках Pages источником должны быть GitHub Actions. Публичные страницы перечислены в mkdocs.yml; внутренние рабочие журналы и пакеты проектирования исключены из сайта. Ссылки на результаты должны вести к доступным читателю сводкам, а не к локальным журналам.
 
-1. **Trusted Publisher** on PyPI: register the repository with workflow file
-   `release.yml` **and environment `pypi`** — the environment name is part of
-   the trust anchor.
-2. **Environment protection rules** for `pypi` in GitHub settings (required
-   reviewers / tag-only deployment policy) — without them the environment is
-   decorative.
-3. **GitHub Pages** for the docs site: repository Settings → Pages → Source =
-   "GitHub Actions". `docs-deploy.yml` then publishes the site (plus
-   `llms.txt`/`llms-full.txt`) to `https://sukhov-is.github.io/HonestML/` on
-   every push to `main` — the `Documentation` URL in `pyproject.toml`.
+## Пакет PyPI
 
-## Per-release checklist
+Push тега vX.Y.Z запускает release.yml:
 
-1. Full suite green on `main` (the check job enforces this mechanically).
-2. Green `workflow_dispatch` run of `benchmark.yml` **on the commit being
-   tagged** — the gate is no regress vs `benchmarks/baseline.json`.
-3. Bump the version in BOTH places: `pyproject.toml` and
-   `honestml.__version__` (plus the pin in `tests/unit/test_public_api.py`).
-4. Cut the release section out of `[Unreleased]` in `CHANGELOG.md`.
-5. Tag `vX.Y.Z` and push; the pipeline does the rest.
-6. Paste the benchmark run URL into the auto-created GitHub Release notes
-   (the SBOM is attached by CI).
+1. Check сверяет тег, версию pyproject.toml и honestml.__version__, принадлежность коммита main и успешный CI на этом SHA.
+2. Build создаёт sdist и wheel.
+3. Audit устанавливает wheel с boosting extra в чистое окружение, выполняет pip-audit и создаёт CycloneDX SBOM. Исключения уязвимостей учитываются в audits/pip-audit-ignore.txt с обоснованием, сроком пересмотра и записью CHANGELOG.
+4. Publish загружает пакет на PyPI через OIDC в environment pypi с attestations.
+5. GitHub-release создаёт релиз и прикладывает дистрибутивы и SBOM.
 
-### First release
+Trusted Publisher на PyPI должен указывать этот репозиторий, release.yml и environment pypi. Правила защиты environment задают требуемых reviewers и ограничения публикации. Эти настройки проверяются отдельно от содержимого workflow.
 
-`benchmarks/baseline.json` does not exist until it is bootstrapped: dispatch
-`benchmark.yml` with `update_baseline: true`, download the `benchmark-results`
-artifact, and commit `baseline.json` together with a CHANGELOG line.
-Subsequent releases gate against the committed baseline.
+## Последовательность выпуска
+
+1. Согласовать версию по [политике версионирования](versioning-policy.md). Обновить pyproject.toml, honestml.__version__, проверку версии в tests/unit/test_public_api.py и согласованный lockfile. Оформить секцию релиза из Unreleased в CHANGELOG.
+2. Проверить готовое дерево, закоммитить изменения и отправить коммит в main. Дождаться успешного CI на точном SHA выпуска.
+3. Запустить benchmark.yml через workflow_dispatch на этом же коммите с update_baseline=false. Требуется успешная проверка против benchmarks/baseline.json; результаты другой ревизии не заменяют её.
+4. Создать и отправить тег vX.Y.Z на проверенный коммит. Проверить завершение release.yml и доступность нужной версии на PyPI.
+5. Добавить ссылку на успешный benchmark run в заметки созданного GitHub Release и проверить приложенные дистрибутивы и SBOM.
+
+Изменение baseline — отдельная содержательная работа: update_baseline=true создаёт артефакт benchmark-results, который нужно проверить и закоммитить вместе с обоснованием в CHANGELOG. Перезапись эталона не заменяет успешную проверку регрессий.

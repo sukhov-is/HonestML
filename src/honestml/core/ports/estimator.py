@@ -10,9 +10,12 @@ is a first-class optional argument.
 
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from ..context import RunContext
 
 
 @runtime_checkable
@@ -75,6 +78,30 @@ class SupportsEarlyStopping(Protocol):
 
 
 @runtime_checkable
+class SupportsIterationPlan(Protocol):
+    """Models exposing their configured boosting ceiling before training."""
+
+    def iteration_limit(self, *, early_stopping: bool) -> int: ...
+
+
+@runtime_checkable
+class SupportsIterationBudget(Protocol):
+    """Models transferring DEV-selected boosting rounds to full-data refit.
+
+    ``fitted_iterations`` is a count, never a zero-based index, and is ``None`` before fit.
+    The application aggregates completed DEV folds and applies that count before refit.
+    """
+
+    @property
+    def fitted_iterations(self) -> int | None: ...
+
+    def set_refit_iterations(self, count: int) -> None: ...
+
+    @property
+    def iteration_budget(self) -> int | None: ...
+
+
+@runtime_checkable
 class SupportsNativeCategorical(Protocol):
     """Models that consume categorical columns natively (role-interface, ADR-0088).
 
@@ -104,3 +131,24 @@ class SupportsNativeModel(Protocol):
     def native_format(self) -> str: ...
 
     def native_model(self) -> Any: ...
+
+
+@runtime_checkable
+class SupportsThreadLimit(Protocol):
+    """Estimators accepting the run's native worker limit before fit."""
+
+    def set_threads(self, threads: int) -> None: ...
+
+
+@runtime_checkable
+class SupportsFitContext(Protocol):
+    """Components attributing every underlying model fit to the current run."""
+
+    def set_run_context(self, ctx: RunContext) -> None: ...
+
+
+@runtime_checkable
+class SupportsRankerBudget(Protocol):
+    """Feature rankers accepting a tree cap for a limited search stage."""
+
+    def set_ranker_iterations(self, iterations: int) -> None: ...

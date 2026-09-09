@@ -1,0 +1,5039 @@
+{
+  "date": "2026-09-09",
+  "quality_acceptance": "pending_review",
+  "speed_acceptance": "pending_thresholds",
+  "primary_summary": {
+    "corpus_status": "incomplete_or_not_comparable",
+    "completed_pairs": 17,
+    "comparable_pairs": 17,
+    "pipeline_group_counts": {
+      "single_same_family": 3,
+      "single_different_family": 11,
+      "ensemble_vs_single": 3
+    },
+    "quality_direction_counts": {
+      "equal": 3,
+      "worse": 11,
+      "better": 3
+    },
+    "speed_direction_counts": {
+      "faster": 15,
+      "slower": 2
+    }
+  },
+  "pairs": [
+    {
+      "notebook": "01-titanic",
+      "fit_index": 1,
+      "comparable": true,
+      "pipeline_group": "single_same_family",
+      "quality_direction_observed": "equal",
+      "baseline": {
+        "status": "completed",
+        "elapsed_s": 106.15402380004525,
+        "metric": "accuracy",
+        "holdout_score": 0.776536312849162,
+        "winner": "lightgbm",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 22,
+          "completed": 22,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": null,
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      },
+      "fast": {
+        "status": "completed",
+        "elapsed_s": 3.6270353000145406,
+        "metric": "accuracy",
+        "holdout_score": 0.776536312849162,
+        "winner": "lightgbm",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 15,
+          "completed": 15,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": {
+            "max_rows": 4096,
+            "max_features": 64,
+            "model_iterations": 64,
+            "max_folds": 1,
+            "max_probe_fits": 64,
+            "confirmation_rows": 16384,
+            "confirmation_iterations": 256,
+            "confirmation_folds": 2,
+            "min_es_rows": 10,
+            "min_class_count": 5,
+            "model_margin": 0.0,
+            "max_fs_fits": 64,
+            "reserve_fraction": 0.3,
+            "probe_fraction": 0.2,
+            "threads": 4
+          },
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      }
+    },
+    {
+      "notebook": "01-titanic",
+      "fit_index": 2,
+      "comparable": true,
+      "pipeline_group": "single_different_family",
+      "quality_direction_observed": "worse",
+      "baseline": {
+        "status": "completed",
+        "elapsed_s": 102.39625119999982,
+        "metric": "accuracy",
+        "holdout_score": 0.7988826815642458,
+        "winner": "linear",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 22,
+          "completed": 22,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": null,
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      },
+      "fast": {
+        "status": "completed",
+        "elapsed_s": 3.2367457000073045,
+        "metric": "accuracy",
+        "holdout_score": 0.7597765363128491,
+        "winner": "lightgbm",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 15,
+          "completed": 15,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": {
+            "max_rows": 4096,
+            "max_features": 64,
+            "model_iterations": 64,
+            "max_folds": 1,
+            "max_probe_fits": 64,
+            "confirmation_rows": 16384,
+            "confirmation_iterations": 256,
+            "confirmation_folds": 2,
+            "min_es_rows": 10,
+            "min_class_count": 5,
+            "model_margin": 0.0,
+            "max_fs_fits": 64,
+            "reserve_fraction": 0.3,
+            "probe_fraction": 0.2,
+            "threads": 4
+          },
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      }
+    },
+    {
+      "notebook": "01-titanic",
+      "fit_index": 3,
+      "comparable": true,
+      "pipeline_group": "single_different_family",
+      "quality_direction_observed": "better",
+      "baseline": {
+        "status": "completed",
+        "elapsed_s": 124.45392750005703,
+        "metric": "accuracy",
+        "holdout_score": 0.9385474860335196,
+        "winner": "linear",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 962,
+          "completed": 962,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": null,
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": true,
+            "te_smoothing": 10.0,
+            "frequency_encoding": true,
+            "intersections": true,
+            "max_pairs": 50
+          },
+          "fs": {
+            "strategy": "importance",
+            "compare": [
+              "importance",
+              "null_importance"
+            ],
+            "selection_holdout": 0.25,
+            "arbitration": "nested_per_fold",
+            "arbitration_n_splits": 5,
+            "null_block_size": 50,
+            "null_block_mode": "rank",
+            "null_block_window": null,
+            "shap_max_samples": null,
+            "shap_perturbation": "tree_path_dependent",
+            "shap_background_samples": null,
+            "shap_background": "linspace",
+            "cost_budget_refits": null,
+            "cutoff": "auto",
+            "top_k": null,
+            "top_frac": 0.5,
+            "min_features": 1,
+            "n_probes": 3,
+            "n_runs": 30,
+            "null_percentile": 95.0,
+            "seq_min_features": 1,
+            "seq_patience": 2,
+            "refine": true,
+            "refine_max_features": 200,
+            "refine_drop_frac": 0.05,
+            "refine_tol": 0.01,
+            "refine_min_mass": 0.99,
+            "random_state": 42
+          },
+          "hpo": {
+            "backend": "optuna",
+            "n_trials": 5,
+            "timeout_s": null,
+            "inner_cv": 3,
+            "models": null,
+            "keep_baseline": false,
+            "random_state": 42
+          },
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      },
+      "fast": {
+        "status": "completed",
+        "elapsed_s": 24.675832699984312,
+        "metric": "accuracy",
+        "holdout_score": 0.9553072625698324,
+        "winner": "lightgbm",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 50,
+          "completed": 50,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": {
+            "max_rows": 4096,
+            "max_features": 64,
+            "model_iterations": 64,
+            "max_folds": 1,
+            "max_probe_fits": 64,
+            "confirmation_rows": 16384,
+            "confirmation_iterations": 256,
+            "confirmation_folds": 2,
+            "min_es_rows": 10,
+            "min_class_count": 5,
+            "model_margin": 0.0,
+            "max_fs_fits": 64,
+            "reserve_fraction": 0.3,
+            "probe_fraction": 0.2,
+            "threads": 4
+          },
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": true,
+            "te_smoothing": 10.0,
+            "frequency_encoding": true,
+            "intersections": true,
+            "max_pairs": 50
+          },
+          "fs": {
+            "strategy": "importance",
+            "compare": [
+              "importance",
+              "null_importance"
+            ],
+            "selection_holdout": 0.25,
+            "arbitration": "nested_per_fold",
+            "arbitration_n_splits": 5,
+            "null_block_size": 50,
+            "null_block_mode": "rank",
+            "null_block_window": null,
+            "shap_max_samples": null,
+            "shap_perturbation": "tree_path_dependent",
+            "shap_background_samples": null,
+            "shap_background": "linspace",
+            "cost_budget_refits": null,
+            "cutoff": "auto",
+            "top_k": null,
+            "top_frac": 0.5,
+            "min_features": 1,
+            "n_probes": 3,
+            "n_runs": 30,
+            "null_percentile": 95.0,
+            "seq_min_features": 1,
+            "seq_patience": 2,
+            "refine": true,
+            "refine_max_features": 200,
+            "refine_drop_frac": 0.05,
+            "refine_tol": 0.01,
+            "refine_min_mass": 0.99,
+            "random_state": 42
+          },
+          "hpo": {
+            "backend": "optuna",
+            "n_trials": 5,
+            "timeout_s": null,
+            "inner_cv": 3,
+            "models": null,
+            "keep_baseline": false,
+            "random_state": 42
+          },
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      }
+    },
+    {
+      "notebook": "02-house-prices",
+      "fit_index": 1,
+      "comparable": true,
+      "pipeline_group": "single_different_family",
+      "quality_direction_observed": "worse",
+      "baseline": {
+        "status": "completed",
+        "elapsed_s": 515.1999366999371,
+        "metric": "rmse",
+        "holdout_score": 0.12938055014083197,
+        "winner": "catboost",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 22,
+          "completed": 22,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": null,
+          "cv": {
+            "scheme": "kfold",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      },
+      "fast": {
+        "status": "completed",
+        "elapsed_s": 45.67100279999431,
+        "metric": "rmse",
+        "holdout_score": 0.14127519940581706,
+        "winner": "lightgbm",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 15,
+          "completed": 15,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": {
+            "max_rows": 4096,
+            "max_features": 64,
+            "model_iterations": 64,
+            "max_folds": 1,
+            "max_probe_fits": 64,
+            "confirmation_rows": 16384,
+            "confirmation_iterations": 256,
+            "confirmation_folds": 2,
+            "min_es_rows": 10,
+            "min_class_count": 5,
+            "model_margin": 0.0,
+            "max_fs_fits": 64,
+            "reserve_fraction": 0.3,
+            "probe_fraction": 0.2,
+            "threads": 4
+          },
+          "cv": {
+            "scheme": "kfold",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      }
+    },
+    {
+      "notebook": "02-house-prices",
+      "fit_index": 2,
+      "comparable": true,
+      "pipeline_group": "ensemble_vs_single",
+      "quality_direction_observed": "worse",
+      "baseline": {
+        "status": "completed",
+        "elapsed_s": 1809.7777300999733,
+        "metric": "rmse",
+        "holdout_score": 0.13502749401523126,
+        "winner": "lightgbm",
+        "ensemble_applied": true,
+        "fit_counts": {
+          "attempted": 958,
+          "completed": 958,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": null,
+          "cv": {
+            "scheme": "kfold",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": true,
+            "intersections": true,
+            "max_pairs": 50
+          },
+          "fs": {
+            "strategy": "importance",
+            "compare": [
+              "importance",
+              "null_importance"
+            ],
+            "selection_holdout": 0.25,
+            "arbitration": "nested_per_fold",
+            "arbitration_n_splits": 5,
+            "null_block_size": 50,
+            "null_block_mode": "rank",
+            "null_block_window": null,
+            "shap_max_samples": null,
+            "shap_perturbation": "tree_path_dependent",
+            "shap_background_samples": null,
+            "shap_background": "linspace",
+            "cost_budget_refits": null,
+            "cutoff": "auto",
+            "top_k": null,
+            "top_frac": 0.5,
+            "min_features": 1,
+            "n_probes": 3,
+            "n_runs": 30,
+            "null_percentile": 95.0,
+            "seq_min_features": 1,
+            "seq_patience": 2,
+            "refine": true,
+            "refine_max_features": 200,
+            "refine_drop_frac": 0.05,
+            "refine_tol": 0.01,
+            "refine_min_mass": 0.99,
+            "random_state": 42
+          },
+          "hpo": {
+            "backend": "optuna",
+            "n_trials": 5,
+            "timeout_s": null,
+            "inner_cv": 3,
+            "models": null,
+            "keep_baseline": false,
+            "random_state": 42
+          },
+          "ensemble": {
+            "method": "caruana",
+            "size": 50,
+            "n_bags": 20,
+            "metric": null,
+            "random_state": 42
+          },
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      },
+      "fast": {
+        "status": "completed",
+        "elapsed_s": 56.27426569990348,
+        "metric": "rmse",
+        "holdout_score": 0.1383964611621915,
+        "winner": "lightgbm",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 46,
+          "completed": 46,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": {
+            "max_rows": 4096,
+            "max_features": 64,
+            "model_iterations": 64,
+            "max_folds": 1,
+            "max_probe_fits": 64,
+            "confirmation_rows": 16384,
+            "confirmation_iterations": 256,
+            "confirmation_folds": 2,
+            "min_es_rows": 10,
+            "min_class_count": 5,
+            "model_margin": 0.0,
+            "max_fs_fits": 64,
+            "reserve_fraction": 0.3,
+            "probe_fraction": 0.2,
+            "threads": 4
+          },
+          "cv": {
+            "scheme": "kfold",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": true,
+            "intersections": true,
+            "max_pairs": 50
+          },
+          "fs": {
+            "strategy": "importance",
+            "compare": [
+              "importance",
+              "null_importance"
+            ],
+            "selection_holdout": 0.25,
+            "arbitration": "nested_per_fold",
+            "arbitration_n_splits": 5,
+            "null_block_size": 50,
+            "null_block_mode": "rank",
+            "null_block_window": null,
+            "shap_max_samples": null,
+            "shap_perturbation": "tree_path_dependent",
+            "shap_background_samples": null,
+            "shap_background": "linspace",
+            "cost_budget_refits": null,
+            "cutoff": "auto",
+            "top_k": null,
+            "top_frac": 0.5,
+            "min_features": 1,
+            "n_probes": 3,
+            "n_runs": 30,
+            "null_percentile": 95.0,
+            "seq_min_features": 1,
+            "seq_patience": 2,
+            "refine": true,
+            "refine_max_features": 200,
+            "refine_drop_frac": 0.05,
+            "refine_tol": 0.01,
+            "refine_min_mass": 0.99,
+            "random_state": 42
+          },
+          "hpo": {
+            "backend": "optuna",
+            "n_trials": 5,
+            "timeout_s": null,
+            "inner_cv": 3,
+            "models": null,
+            "keep_baseline": false,
+            "random_state": 42
+          },
+          "ensemble": {
+            "method": "caruana",
+            "size": 50,
+            "n_bags": 20,
+            "metric": null,
+            "random_state": 42
+          },
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      }
+    },
+    {
+      "notebook": "03-adult-income",
+      "fit_index": 1,
+      "comparable": true,
+      "pipeline_group": "single_same_family",
+      "quality_direction_observed": "equal",
+      "baseline": {
+        "status": "completed",
+        "elapsed_s": 559.6041215000441,
+        "metric": "roc_auc",
+        "holdout_score": 0.9234281174552733,
+        "winner": "catboost",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 22,
+          "completed": 22,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": null,
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": {
+            "method": "caruana",
+            "size": 50,
+            "n_bags": 20,
+            "metric": null,
+            "random_state": 42
+          },
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      },
+      "fast": {
+        "status": "completed",
+        "elapsed_s": 252.98305180005264,
+        "metric": "roc_auc",
+        "holdout_score": 0.9234281174552733,
+        "winner": "catboost",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 15,
+          "completed": 15,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": {
+            "max_rows": 4096,
+            "max_features": 64,
+            "model_iterations": 64,
+            "max_folds": 1,
+            "max_probe_fits": 64,
+            "confirmation_rows": 16384,
+            "confirmation_iterations": 256,
+            "confirmation_folds": 2,
+            "min_es_rows": 10,
+            "min_class_count": 5,
+            "model_margin": 0.0,
+            "max_fs_fits": 64,
+            "reserve_fraction": 0.3,
+            "probe_fraction": 0.2,
+            "threads": 4
+          },
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": {
+            "method": "caruana",
+            "size": 50,
+            "n_bags": 20,
+            "metric": null,
+            "random_state": 42
+          },
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      }
+    },
+    {
+      "notebook": "03-adult-income",
+      "fit_index": 2,
+      "comparable": true,
+      "pipeline_group": "single_different_family",
+      "quality_direction_observed": "better",
+      "baseline": {
+        "status": "completed",
+        "elapsed_s": 858.3531823999947,
+        "metric": "roc_auc",
+        "holdout_score": 0.913823938321537,
+        "winner": "lightgbm",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 227,
+          "completed": 227,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": null,
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": true,
+            "te_smoothing": 10.0,
+            "frequency_encoding": true,
+            "intersections": true,
+            "max_pairs": 50
+          },
+          "fs": {
+            "strategy": "null_importance",
+            "compare": null,
+            "selection_holdout": 0.25,
+            "arbitration": "holdout",
+            "arbitration_n_splits": 5,
+            "null_block_size": 50,
+            "null_block_mode": "rank",
+            "null_block_window": null,
+            "shap_max_samples": null,
+            "shap_perturbation": "tree_path_dependent",
+            "shap_background_samples": null,
+            "shap_background": "linspace",
+            "cost_budget_refits": null,
+            "cutoff": "auto",
+            "top_k": null,
+            "top_frac": 0.5,
+            "min_features": 1,
+            "n_probes": 3,
+            "n_runs": 30,
+            "null_percentile": 95.0,
+            "seq_min_features": 1,
+            "seq_patience": 2,
+            "refine": true,
+            "refine_max_features": 200,
+            "refine_drop_frac": 0.05,
+            "refine_tol": 0.01,
+            "refine_min_mass": 0.99,
+            "random_state": 42
+          },
+          "hpo": {
+            "backend": "optuna",
+            "n_trials": 5,
+            "timeout_s": 600.0,
+            "inner_cv": 3,
+            "models": null,
+            "keep_baseline": false,
+            "random_state": 42
+          },
+          "ensemble": {
+            "method": "caruana",
+            "size": 50,
+            "n_bags": 20,
+            "metric": null,
+            "random_state": 42
+          },
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      },
+      "fast": {
+        "status": "completed",
+        "elapsed_s": 580.5654728000518,
+        "metric": "roc_auc",
+        "holdout_score": 0.9224611672272549,
+        "winner": "catboost",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 65,
+          "completed": 65,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": {
+            "max_rows": 4096,
+            "max_features": 64,
+            "model_iterations": 64,
+            "max_folds": 1,
+            "max_probe_fits": 64,
+            "confirmation_rows": 16384,
+            "confirmation_iterations": 256,
+            "confirmation_folds": 2,
+            "min_es_rows": 10,
+            "min_class_count": 5,
+            "model_margin": 0.0,
+            "max_fs_fits": 64,
+            "reserve_fraction": 0.3,
+            "probe_fraction": 0.2,
+            "threads": 4
+          },
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": true,
+            "te_smoothing": 10.0,
+            "frequency_encoding": true,
+            "intersections": true,
+            "max_pairs": 50
+          },
+          "fs": {
+            "strategy": "null_importance",
+            "compare": null,
+            "selection_holdout": 0.25,
+            "arbitration": "holdout",
+            "arbitration_n_splits": 5,
+            "null_block_size": 50,
+            "null_block_mode": "rank",
+            "null_block_window": null,
+            "shap_max_samples": null,
+            "shap_perturbation": "tree_path_dependent",
+            "shap_background_samples": null,
+            "shap_background": "linspace",
+            "cost_budget_refits": null,
+            "cutoff": "auto",
+            "top_k": null,
+            "top_frac": 0.5,
+            "min_features": 1,
+            "n_probes": 3,
+            "n_runs": 30,
+            "null_percentile": 95.0,
+            "seq_min_features": 1,
+            "seq_patience": 2,
+            "refine": true,
+            "refine_max_features": 200,
+            "refine_drop_frac": 0.05,
+            "refine_tol": 0.01,
+            "refine_min_mass": 0.99,
+            "random_state": 42
+          },
+          "hpo": {
+            "backend": "optuna",
+            "n_trials": 5,
+            "timeout_s": 600.0,
+            "inner_cv": 3,
+            "models": null,
+            "keep_baseline": false,
+            "random_state": 42
+          },
+          "ensemble": {
+            "method": "caruana",
+            "size": 50,
+            "n_bags": 20,
+            "metric": null,
+            "random_state": 42
+          },
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      }
+    },
+    {
+      "notebook": "04-credit-card-fraud",
+      "fit_index": 1,
+      "comparable": true,
+      "pipeline_group": "single_same_family",
+      "quality_direction_observed": "equal",
+      "baseline": {
+        "status": "completed",
+        "elapsed_s": 215.0118617999833,
+        "metric": "pr_auc",
+        "holdout_score": 0.8488458660462578,
+        "winner": "catboost",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 22,
+          "completed": 22,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": null,
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "auto",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      },
+      "fast": {
+        "status": "completed",
+        "elapsed_s": 27.847014700062573,
+        "metric": "pr_auc",
+        "holdout_score": 0.8488458660462578,
+        "winner": "catboost",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 15,
+          "completed": 15,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": {
+            "max_rows": 4096,
+            "max_features": 64,
+            "model_iterations": 64,
+            "max_folds": 1,
+            "max_probe_fits": 64,
+            "confirmation_rows": 16384,
+            "confirmation_iterations": 256,
+            "confirmation_folds": 2,
+            "min_es_rows": 10,
+            "min_class_count": 5,
+            "model_margin": 0.0,
+            "max_fs_fits": 64,
+            "reserve_fraction": 0.3,
+            "probe_fraction": 0.2,
+            "threads": 4
+          },
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "auto",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      }
+    },
+    {
+      "notebook": "04-credit-card-fraud",
+      "fit_index": 2,
+      "comparable": true,
+      "pipeline_group": "ensemble_vs_single",
+      "quality_direction_observed": "worse",
+      "baseline": {
+        "status": "completed",
+        "elapsed_s": 598.0629808000522,
+        "metric": "pr_auc",
+        "holdout_score": 0.87352418590109,
+        "winner": "lightgbm",
+        "ensemble_applied": true,
+        "fit_counts": {
+          "attempted": 73,
+          "completed": 73,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": null,
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "auto",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": {
+            "strategy": "importance",
+            "compare": null,
+            "selection_holdout": 0.25,
+            "arbitration": "holdout",
+            "arbitration_n_splits": 5,
+            "null_block_size": 50,
+            "null_block_mode": "rank",
+            "null_block_window": null,
+            "shap_max_samples": null,
+            "shap_perturbation": "tree_path_dependent",
+            "shap_background_samples": null,
+            "shap_background": "linspace",
+            "cost_budget_refits": null,
+            "cutoff": "auto",
+            "top_k": null,
+            "top_frac": 0.5,
+            "min_features": 1,
+            "n_probes": 3,
+            "n_runs": 30,
+            "null_percentile": 95.0,
+            "seq_min_features": 1,
+            "seq_patience": 2,
+            "refine": true,
+            "refine_max_features": 200,
+            "refine_drop_frac": 0.05,
+            "refine_tol": 0.01,
+            "refine_min_mass": 0.99,
+            "random_state": 42
+          },
+          "hpo": {
+            "backend": "optuna",
+            "n_trials": 5,
+            "timeout_s": 900.0,
+            "inner_cv": 3,
+            "models": null,
+            "keep_baseline": false,
+            "random_state": 42
+          },
+          "ensemble": {
+            "method": "caruana",
+            "size": 50,
+            "n_bags": 20,
+            "metric": null,
+            "random_state": 42
+          },
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      },
+      "fast": {
+        "status": "completed",
+        "elapsed_s": 136.86359449999873,
+        "metric": "pr_auc",
+        "holdout_score": 0.8488458660462578,
+        "winner": "catboost",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 40,
+          "completed": 40,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": {
+            "max_rows": 4096,
+            "max_features": 64,
+            "model_iterations": 64,
+            "max_folds": 1,
+            "max_probe_fits": 64,
+            "confirmation_rows": 16384,
+            "confirmation_iterations": 256,
+            "confirmation_folds": 2,
+            "min_es_rows": 10,
+            "min_class_count": 5,
+            "model_margin": 0.0,
+            "max_fs_fits": 64,
+            "reserve_fraction": 0.3,
+            "probe_fraction": 0.2,
+            "threads": 4
+          },
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "auto",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": {
+            "strategy": "importance",
+            "compare": null,
+            "selection_holdout": 0.25,
+            "arbitration": "holdout",
+            "arbitration_n_splits": 5,
+            "null_block_size": 50,
+            "null_block_mode": "rank",
+            "null_block_window": null,
+            "shap_max_samples": null,
+            "shap_perturbation": "tree_path_dependent",
+            "shap_background_samples": null,
+            "shap_background": "linspace",
+            "cost_budget_refits": null,
+            "cutoff": "auto",
+            "top_k": null,
+            "top_frac": 0.5,
+            "min_features": 1,
+            "n_probes": 3,
+            "n_runs": 30,
+            "null_percentile": 95.0,
+            "seq_min_features": 1,
+            "seq_patience": 2,
+            "refine": true,
+            "refine_max_features": 200,
+            "refine_drop_frac": 0.05,
+            "refine_tol": 0.01,
+            "refine_min_mass": 0.99,
+            "random_state": 42
+          },
+          "hpo": {
+            "backend": "optuna",
+            "n_trials": 5,
+            "timeout_s": 900.0,
+            "inner_cv": 3,
+            "models": null,
+            "keep_baseline": false,
+            "random_state": 42
+          },
+          "ensemble": {
+            "method": "caruana",
+            "size": 50,
+            "n_bags": 20,
+            "metric": null,
+            "random_state": 42
+          },
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      }
+    },
+    {
+      "notebook": "05-otto-product-classification",
+      "fit_index": 1,
+      "comparable": true,
+      "pipeline_group": "single_different_family",
+      "quality_direction_observed": "worse",
+      "baseline": {
+        "status": "completed",
+        "elapsed_s": 2372.2718958000187,
+        "metric": "log_loss",
+        "holdout_score": 0.4763246602908991,
+        "winner": "lightgbm",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 22,
+          "completed": 22,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": null,
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "auto",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      },
+      "fast": {
+        "status": "completed",
+        "elapsed_s": 8487.017258599983,
+        "metric": "log_loss",
+        "holdout_score": 0.5009281140476991,
+        "winner": "catboost",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 15,
+          "completed": 15,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": {
+            "max_rows": 4096,
+            "max_features": 64,
+            "model_iterations": 64,
+            "max_folds": 1,
+            "max_probe_fits": 64,
+            "confirmation_rows": 16384,
+            "confirmation_iterations": 256,
+            "confirmation_folds": 2,
+            "min_es_rows": 10,
+            "min_class_count": 5,
+            "model_margin": 0.0,
+            "max_fs_fits": 64,
+            "reserve_fraction": 0.3,
+            "probe_fraction": 0.2,
+            "threads": 4
+          },
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "auto",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      }
+    },
+    {
+      "notebook": "05-otto-product-classification",
+      "fit_index": 2,
+      "comparable": true,
+      "pipeline_group": "single_different_family",
+      "quality_direction_observed": "worse",
+      "baseline": {
+        "status": "completed",
+        "elapsed_s": 1825.2338208999718,
+        "metric": "log_loss",
+        "holdout_score": 0.47478675507288126,
+        "winner": "lightgbm",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 67,
+          "completed": 67,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": null,
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "auto",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": {
+            "strategy": "importance",
+            "compare": null,
+            "selection_holdout": 0.25,
+            "arbitration": "holdout",
+            "arbitration_n_splits": 5,
+            "null_block_size": 50,
+            "null_block_mode": "rank",
+            "null_block_window": null,
+            "shap_max_samples": null,
+            "shap_perturbation": "tree_path_dependent",
+            "shap_background_samples": null,
+            "shap_background": "linspace",
+            "cost_budget_refits": null,
+            "cutoff": "auto",
+            "top_k": null,
+            "top_frac": 0.5,
+            "min_features": 1,
+            "n_probes": 3,
+            "n_runs": 30,
+            "null_percentile": 95.0,
+            "seq_min_features": 1,
+            "seq_patience": 2,
+            "refine": true,
+            "refine_max_features": 200,
+            "refine_drop_frac": 0.05,
+            "refine_tol": 0.01,
+            "refine_min_mass": 0.99,
+            "random_state": 42
+          },
+          "hpo": {
+            "backend": "optuna",
+            "n_trials": 5,
+            "timeout_s": 900.0,
+            "inner_cv": 3,
+            "models": null,
+            "keep_baseline": false,
+            "random_state": 42
+          },
+          "ensemble": {
+            "method": "caruana",
+            "size": 50,
+            "n_bags": 20,
+            "metric": null,
+            "random_state": 42
+          },
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      },
+      "fast": {
+        "status": "completed",
+        "elapsed_s": 4955.656060399953,
+        "metric": "log_loss",
+        "holdout_score": 0.5009281140476991,
+        "winner": "catboost",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 40,
+          "completed": 40,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": {
+            "max_rows": 4096,
+            "max_features": 64,
+            "model_iterations": 64,
+            "max_folds": 1,
+            "max_probe_fits": 64,
+            "confirmation_rows": 16384,
+            "confirmation_iterations": 256,
+            "confirmation_folds": 2,
+            "min_es_rows": 10,
+            "min_class_count": 5,
+            "model_margin": 0.0,
+            "max_fs_fits": 64,
+            "reserve_fraction": 0.3,
+            "probe_fraction": 0.2,
+            "threads": 4
+          },
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "auto",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": {
+            "strategy": "importance",
+            "compare": null,
+            "selection_holdout": 0.25,
+            "arbitration": "holdout",
+            "arbitration_n_splits": 5,
+            "null_block_size": 50,
+            "null_block_mode": "rank",
+            "null_block_window": null,
+            "shap_max_samples": null,
+            "shap_perturbation": "tree_path_dependent",
+            "shap_background_samples": null,
+            "shap_background": "linspace",
+            "cost_budget_refits": null,
+            "cutoff": "auto",
+            "top_k": null,
+            "top_frac": 0.5,
+            "min_features": 1,
+            "n_probes": 3,
+            "n_runs": 30,
+            "null_percentile": 95.0,
+            "seq_min_features": 1,
+            "seq_patience": 2,
+            "refine": true,
+            "refine_max_features": 200,
+            "refine_drop_frac": 0.05,
+            "refine_tol": 0.01,
+            "refine_min_mass": 0.99,
+            "random_state": 42
+          },
+          "hpo": {
+            "backend": "optuna",
+            "n_trials": 5,
+            "timeout_s": 900.0,
+            "inner_cv": 3,
+            "models": null,
+            "keep_baseline": false,
+            "random_state": 42
+          },
+          "ensemble": {
+            "method": "caruana",
+            "size": 50,
+            "n_bags": 20,
+            "metric": null,
+            "random_state": 42
+          },
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      }
+    },
+    {
+      "notebook": "06-store-sales",
+      "fit_index": 1,
+      "comparable": true,
+      "pipeline_group": "single_different_family",
+      "quality_direction_observed": "worse",
+      "baseline": {
+        "status": "completed",
+        "elapsed_s": 5630.224790700013,
+        "metric": "rmse",
+        "holdout_score": 0.37225493247393326,
+        "winner": "lightgbm",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 22,
+          "completed": 22,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": null,
+          "cv": {
+            "scheme": "kfold",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      },
+      "fast": {
+        "status": "completed",
+        "elapsed_s": 1743.65162889997,
+        "metric": "rmse",
+        "holdout_score": 0.3807581696507473,
+        "winner": "catboost",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 15,
+          "completed": 15,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": {
+            "max_rows": 4096,
+            "max_features": 64,
+            "model_iterations": 64,
+            "max_folds": 1,
+            "max_probe_fits": 64,
+            "confirmation_rows": 16384,
+            "confirmation_iterations": 256,
+            "confirmation_folds": 2,
+            "min_es_rows": 10,
+            "min_class_count": 5,
+            "model_margin": 0.0,
+            "max_fs_fits": 64,
+            "reserve_fraction": 0.3,
+            "probe_fraction": 0.2,
+            "threads": 4
+          },
+          "cv": {
+            "scheme": "kfold",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      }
+    },
+    {
+      "notebook": "06-store-sales",
+      "fit_index": 2,
+      "comparable": true,
+      "pipeline_group": "single_different_family",
+      "quality_direction_observed": "worse",
+      "baseline": {
+        "status": "completed",
+        "elapsed_s": 155.95171260007191,
+        "metric": "rmse",
+        "holdout_score": 0.39345168684690923,
+        "winner": "lightgbm",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 18,
+          "completed": 18,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": null,
+          "cv": {
+            "scheme": "timeseries_period",
+            "n_splits": 4,
+            "n_test": 4,
+            "n_es": 1,
+            "purge": 1,
+            "embargo": 1,
+            "period": "week",
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      },
+      "fast": {
+        "status": "completed",
+        "elapsed_s": 145.53463060001377,
+        "metric": "rmse",
+        "holdout_score": 0.4020098243844344,
+        "winner": "catboost",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 14,
+          "completed": 14,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": {
+            "max_rows": 4096,
+            "max_features": 64,
+            "model_iterations": 64,
+            "max_folds": 1,
+            "max_probe_fits": 64,
+            "confirmation_rows": 16384,
+            "confirmation_iterations": 256,
+            "confirmation_folds": 2,
+            "min_es_rows": 10,
+            "min_class_count": 5,
+            "model_margin": 0.0,
+            "max_fs_fits": 64,
+            "reserve_fraction": 0.3,
+            "probe_fraction": 0.2,
+            "threads": 4
+          },
+          "cv": {
+            "scheme": "timeseries_period",
+            "n_splits": 4,
+            "n_test": 4,
+            "n_es": 1,
+            "purge": 1,
+            "embargo": 1,
+            "period": "week",
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      }
+    },
+    {
+      "notebook": "06-store-sales",
+      "fit_index": 3,
+      "comparable": true,
+      "pipeline_group": "single_different_family",
+      "quality_direction_observed": "worse",
+      "baseline": {
+        "status": "completed",
+        "elapsed_s": 2421.4585792999715,
+        "metric": "rmse",
+        "holdout_score": 0.40279609690741947,
+        "winner": "lightgbm",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 60,
+          "completed": 60,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": null,
+          "cv": {
+            "scheme": "timeseries_period",
+            "n_splits": 4,
+            "n_test": 4,
+            "n_es": 1,
+            "purge": 1,
+            "embargo": 1,
+            "period": "week",
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": true,
+            "intersections": true,
+            "max_pairs": 50
+          },
+          "fs": {
+            "strategy": "importance",
+            "compare": null,
+            "selection_holdout": 0.25,
+            "arbitration": "holdout",
+            "arbitration_n_splits": 5,
+            "null_block_size": 50,
+            "null_block_mode": "rank",
+            "null_block_window": null,
+            "shap_max_samples": null,
+            "shap_perturbation": "tree_path_dependent",
+            "shap_background_samples": null,
+            "shap_background": "linspace",
+            "cost_budget_refits": null,
+            "cutoff": "auto",
+            "top_k": null,
+            "top_frac": 0.5,
+            "min_features": 1,
+            "n_probes": 3,
+            "n_runs": 30,
+            "null_percentile": 95.0,
+            "seq_min_features": 1,
+            "seq_patience": 2,
+            "refine": true,
+            "refine_max_features": 200,
+            "refine_drop_frac": 0.05,
+            "refine_tol": 0.01,
+            "refine_min_mass": 0.99,
+            "random_state": 42
+          },
+          "hpo": {
+            "backend": "optuna",
+            "n_trials": 5,
+            "timeout_s": 600.0,
+            "inner_cv": 3,
+            "models": null,
+            "keep_baseline": false,
+            "random_state": 42
+          },
+          "ensemble": {
+            "method": "caruana",
+            "size": 50,
+            "n_bags": 20,
+            "metric": null,
+            "random_state": 42
+          },
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      },
+      "fast": {
+        "status": "completed",
+        "elapsed_s": 488.6066493000835,
+        "metric": "rmse",
+        "holdout_score": 0.410751530787109,
+        "winner": "catboost",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 37,
+          "completed": 37,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": {
+            "max_rows": 4096,
+            "max_features": 64,
+            "model_iterations": 64,
+            "max_folds": 1,
+            "max_probe_fits": 64,
+            "confirmation_rows": 16384,
+            "confirmation_iterations": 256,
+            "confirmation_folds": 2,
+            "min_es_rows": 10,
+            "min_class_count": 5,
+            "model_margin": 0.0,
+            "max_fs_fits": 64,
+            "reserve_fraction": 0.3,
+            "probe_fraction": 0.2,
+            "threads": 4
+          },
+          "cv": {
+            "scheme": "timeseries_period",
+            "n_splits": 4,
+            "n_test": 4,
+            "n_es": 1,
+            "purge": 1,
+            "embargo": 1,
+            "period": "week",
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": true,
+            "intersections": true,
+            "max_pairs": 50
+          },
+          "fs": {
+            "strategy": "importance",
+            "compare": null,
+            "selection_holdout": 0.25,
+            "arbitration": "holdout",
+            "arbitration_n_splits": 5,
+            "null_block_size": 50,
+            "null_block_mode": "rank",
+            "null_block_window": null,
+            "shap_max_samples": null,
+            "shap_perturbation": "tree_path_dependent",
+            "shap_background_samples": null,
+            "shap_background": "linspace",
+            "cost_budget_refits": null,
+            "cutoff": "auto",
+            "top_k": null,
+            "top_frac": 0.5,
+            "min_features": 1,
+            "n_probes": 3,
+            "n_runs": 30,
+            "null_percentile": 95.0,
+            "seq_min_features": 1,
+            "seq_patience": 2,
+            "refine": true,
+            "refine_max_features": 200,
+            "refine_drop_frac": 0.05,
+            "refine_tol": 0.01,
+            "refine_min_mass": 0.99,
+            "random_state": 42
+          },
+          "hpo": {
+            "backend": "optuna",
+            "n_trials": 5,
+            "timeout_s": 600.0,
+            "inner_cv": 3,
+            "models": null,
+            "keep_baseline": false,
+            "random_state": 42
+          },
+          "ensemble": {
+            "method": "caruana",
+            "size": 50,
+            "n_bags": 20,
+            "metric": null,
+            "random_state": 42
+          },
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      }
+    },
+    {
+      "notebook": "07-ieee-fraud",
+      "fit_index": 1,
+      "comparable": true,
+      "pipeline_group": "single_different_family",
+      "quality_direction_observed": "worse",
+      "baseline": {
+        "status": "completed",
+        "elapsed_s": 4662.655538699939,
+        "metric": "roc_auc",
+        "holdout_score": 0.9558211986722418,
+        "winner": "lightgbm",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 22,
+          "completed": 22,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": null,
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "auto",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      },
+      "fast": {
+        "status": "completed",
+        "elapsed_s": 2339.4063257001108,
+        "metric": "roc_auc",
+        "holdout_score": 0.9366513415821756,
+        "winner": "catboost",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 15,
+          "completed": 15,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": {
+            "max_rows": 4096,
+            "max_features": 64,
+            "model_iterations": 64,
+            "max_folds": 1,
+            "max_probe_fits": 64,
+            "confirmation_rows": 16384,
+            "confirmation_iterations": 256,
+            "confirmation_folds": 2,
+            "min_es_rows": 10,
+            "min_class_count": 5,
+            "model_margin": 0.0,
+            "max_fs_fits": 64,
+            "reserve_fraction": 0.3,
+            "probe_fraction": 0.2,
+            "threads": 4
+          },
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "auto",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      }
+    },
+    {
+      "notebook": "07-ieee-fraud",
+      "fit_index": 2,
+      "comparable": true,
+      "pipeline_group": "single_different_family",
+      "quality_direction_observed": "worse",
+      "baseline": {
+        "status": "completed",
+        "elapsed_s": 3052.1978164999746,
+        "metric": "roc_auc",
+        "holdout_score": 0.9505958159650258,
+        "winner": "lightgbm",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 22,
+          "completed": 22,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": null,
+          "cv": {
+            "scheme": "group",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "auto",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      },
+      "fast": {
+        "status": "completed",
+        "elapsed_s": 2082.969092800049,
+        "metric": "roc_auc",
+        "holdout_score": 0.9378589803695234,
+        "winner": "catboost",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 15,
+          "completed": 15,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": {
+            "max_rows": 4096,
+            "max_features": 64,
+            "model_iterations": 64,
+            "max_folds": 1,
+            "max_probe_fits": 64,
+            "confirmation_rows": 16384,
+            "confirmation_iterations": 256,
+            "confirmation_folds": 2,
+            "min_es_rows": 10,
+            "min_class_count": 5,
+            "model_margin": 0.0,
+            "max_fs_fits": 64,
+            "reserve_fraction": 0.3,
+            "probe_fraction": 0.2,
+            "threads": 4
+          },
+          "cv": {
+            "scheme": "group",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "auto",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      }
+    },
+    {
+      "notebook": "07-ieee-fraud",
+      "fit_index": 3,
+      "comparable": true,
+      "pipeline_group": "ensemble_vs_single",
+      "quality_direction_observed": "better",
+      "baseline": {
+        "status": "completed",
+        "elapsed_s": 1029.5518039000453,
+        "metric": "roc_auc",
+        "holdout_score": 0.8844597404390263,
+        "winner": "lightgbm",
+        "ensemble_applied": true,
+        "fit_counts": {
+          "attempted": 73,
+          "completed": 73,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": null,
+          "cv": {
+            "scheme": "timeseries",
+            "n_splits": 5,
+            "n_test": 16666,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": 86400.0,
+            "embargo_delta": 86400.0,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": {
+            "strategy": "importance",
+            "compare": null,
+            "selection_holdout": 0.25,
+            "arbitration": "holdout",
+            "arbitration_n_splits": 5,
+            "null_block_size": 50,
+            "null_block_mode": "rank",
+            "null_block_window": null,
+            "shap_max_samples": null,
+            "shap_perturbation": "tree_path_dependent",
+            "shap_background_samples": null,
+            "shap_background": "linspace",
+            "cost_budget_refits": null,
+            "cutoff": "auto",
+            "top_k": null,
+            "top_frac": 0.5,
+            "min_features": 1,
+            "n_probes": 3,
+            "n_runs": 30,
+            "null_percentile": 95.0,
+            "seq_min_features": 1,
+            "seq_patience": 2,
+            "refine": true,
+            "refine_max_features": 200,
+            "refine_drop_frac": 0.05,
+            "refine_tol": 0.01,
+            "refine_min_mass": 0.99,
+            "random_state": 42
+          },
+          "hpo": {
+            "backend": "optuna",
+            "n_trials": 5,
+            "timeout_s": 600.0,
+            "inner_cv": 3,
+            "models": null,
+            "keep_baseline": false,
+            "random_state": 42
+          },
+          "ensemble": {
+            "method": "caruana",
+            "size": 50,
+            "n_bags": 20,
+            "metric": null,
+            "random_state": 42
+          },
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      },
+      "fast": {
+        "status": "completed",
+        "elapsed_s": 152.64623050007503,
+        "metric": "roc_auc",
+        "holdout_score": 0.8927859693839189,
+        "winner": "lightgbm",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 40,
+          "completed": 40,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": {
+            "max_rows": 4096,
+            "max_features": 64,
+            "model_iterations": 64,
+            "max_folds": 1,
+            "max_probe_fits": 64,
+            "confirmation_rows": 16384,
+            "confirmation_iterations": 256,
+            "confirmation_folds": 2,
+            "min_es_rows": 10,
+            "min_class_count": 5,
+            "model_margin": 0.0,
+            "max_fs_fits": 64,
+            "reserve_fraction": 0.3,
+            "probe_fraction": 0.2,
+            "threads": 4
+          },
+          "cv": {
+            "scheme": "timeseries",
+            "n_splits": 5,
+            "n_test": 16666,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": 86400.0,
+            "embargo_delta": 86400.0,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "off",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": {
+            "strategy": "importance",
+            "compare": null,
+            "selection_holdout": 0.25,
+            "arbitration": "holdout",
+            "arbitration_n_splits": 5,
+            "null_block_size": 50,
+            "null_block_mode": "rank",
+            "null_block_window": null,
+            "shap_max_samples": null,
+            "shap_perturbation": "tree_path_dependent",
+            "shap_background_samples": null,
+            "shap_background": "linspace",
+            "cost_budget_refits": null,
+            "cutoff": "auto",
+            "top_k": null,
+            "top_frac": 0.5,
+            "min_features": 1,
+            "n_probes": 3,
+            "n_runs": 30,
+            "null_percentile": 95.0,
+            "seq_min_features": 1,
+            "seq_patience": 2,
+            "refine": true,
+            "refine_max_features": 200,
+            "refine_drop_frac": 0.05,
+            "refine_tol": 0.01,
+            "refine_min_mass": 0.99,
+            "random_state": 42
+          },
+          "hpo": {
+            "backend": "optuna",
+            "n_trials": 5,
+            "timeout_s": 600.0,
+            "inner_cv": 3,
+            "models": null,
+            "keep_baseline": false,
+            "random_state": 42
+          },
+          "ensemble": {
+            "method": "caruana",
+            "size": 50,
+            "n_bags": 20,
+            "metric": null,
+            "random_state": 42
+          },
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      }
+    },
+    {
+      "notebook": "08-home-credit",
+      "fit_index": 1,
+      "comparable": false,
+      "pipeline_group": null,
+      "quality_direction_observed": null,
+      "baseline": {
+        "status": "completed",
+        "elapsed_s": 757.1847720999504,
+        "metric": "roc_auc",
+        "holdout_score": 0.7752502350713616,
+        "winner": "catboost",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 22,
+          "completed": 22,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": null,
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "auto",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      },
+      "fast": {
+        "status": "excluded_attempt",
+        "elapsed_s": null,
+        "metric": "roc_auc",
+        "holdout_score": null,
+        "winner": "catboost",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 15,
+          "completed": 15,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": {
+            "max_rows": 4096,
+            "max_features": 64,
+            "model_iterations": 64,
+            "max_folds": 1,
+            "max_probe_fits": 64,
+            "confirmation_rows": 16384,
+            "confirmation_iterations": 256,
+            "confirmation_folds": 2,
+            "min_es_rows": 10,
+            "min_class_count": 5,
+            "model_margin": 0.0,
+            "max_fs_fits": 64,
+            "reserve_fraction": 0.3,
+            "probe_fraction": 0.2,
+            "threads": 4
+          },
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "auto",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": null,
+          "hpo": null,
+          "ensemble": null,
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      }
+    },
+    {
+      "notebook": "08-home-credit",
+      "fit_index": 2,
+      "comparable": false,
+      "pipeline_group": null,
+      "quality_direction_observed": null,
+      "baseline": {
+        "status": "completed",
+        "elapsed_s": 863.1292467999738,
+        "metric": "roc_auc",
+        "holdout_score": 0.7792418125657569,
+        "winner": "lightgbm",
+        "ensemble_applied": true,
+        "fit_counts": {
+          "attempted": 73,
+          "completed": 73,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": null,
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "auto",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": {
+            "strategy": "importance",
+            "compare": null,
+            "selection_holdout": 0.25,
+            "arbitration": "holdout",
+            "arbitration_n_splits": 5,
+            "null_block_size": 50,
+            "null_block_mode": "rank",
+            "null_block_window": null,
+            "shap_max_samples": null,
+            "shap_perturbation": "tree_path_dependent",
+            "shap_background_samples": null,
+            "shap_background": "linspace",
+            "cost_budget_refits": null,
+            "cutoff": "auto",
+            "top_k": null,
+            "top_frac": 0.5,
+            "min_features": 1,
+            "n_probes": 3,
+            "n_runs": 30,
+            "null_percentile": 95.0,
+            "seq_min_features": 1,
+            "seq_patience": 2,
+            "refine": true,
+            "refine_max_features": 200,
+            "refine_drop_frac": 0.05,
+            "refine_tol": 0.01,
+            "refine_min_mass": 0.99,
+            "random_state": 42
+          },
+          "hpo": {
+            "backend": "optuna",
+            "n_trials": 5,
+            "timeout_s": 600.0,
+            "inner_cv": 3,
+            "models": null,
+            "keep_baseline": false,
+            "random_state": 42
+          },
+          "ensemble": {
+            "method": "caruana",
+            "size": 50,
+            "n_bags": 20,
+            "metric": null,
+            "random_state": 42
+          },
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      },
+      "fast": {
+        "status": "excluded_attempt",
+        "elapsed_s": null,
+        "metric": "roc_auc",
+        "holdout_score": null,
+        "winner": "catboost",
+        "ensemble_applied": false,
+        "fit_counts": {
+          "attempted": 40,
+          "completed": 40,
+          "failed": 0
+        },
+        "configuration": {
+          "seed": 42,
+          "search": {
+            "max_rows": 4096,
+            "max_features": 64,
+            "model_iterations": 64,
+            "max_folds": 1,
+            "max_probe_fits": 64,
+            "confirmation_rows": 16384,
+            "confirmation_iterations": 256,
+            "confirmation_folds": 2,
+            "min_es_rows": 10,
+            "min_class_count": 5,
+            "model_margin": 0.0,
+            "max_fs_fits": 64,
+            "reserve_fraction": 0.3,
+            "probe_fraction": 0.2,
+            "threads": 4
+          },
+          "cv": {
+            "scheme": "stratified",
+            "n_splits": 5,
+            "n_test": 1,
+            "n_es": 1,
+            "purge": 0,
+            "embargo": 0,
+            "period": null,
+            "period_size": null,
+            "step_periods": null,
+            "purge_delta": null,
+            "embargo_delta": null,
+            "max_train_periods": null,
+            "max_train_size": null,
+            "weighting": "pooled",
+            "calibrate": "auto",
+            "selection": "raw",
+            "refinement_min_oof": 2000,
+            "outer_holdout": 0.2
+          },
+          "budget": {
+            "mode": "none",
+            "time_budget_s": null,
+            "n_trials": null,
+            "memory_limit_mb": null
+          },
+          "fe": {
+            "target_encoding": false,
+            "te_smoothing": 10.0,
+            "frequency_encoding": false,
+            "intersections": false,
+            "max_pairs": 50
+          },
+          "fs": {
+            "strategy": "importance",
+            "compare": null,
+            "selection_holdout": 0.25,
+            "arbitration": "holdout",
+            "arbitration_n_splits": 5,
+            "null_block_size": 50,
+            "null_block_mode": "rank",
+            "null_block_window": null,
+            "shap_max_samples": null,
+            "shap_perturbation": "tree_path_dependent",
+            "shap_background_samples": null,
+            "shap_background": "linspace",
+            "cost_budget_refits": null,
+            "cutoff": "auto",
+            "top_k": null,
+            "top_frac": 0.5,
+            "min_features": 1,
+            "n_probes": 3,
+            "n_runs": 30,
+            "null_percentile": 95.0,
+            "seq_min_features": 1,
+            "seq_patience": 2,
+            "refine": true,
+            "refine_max_features": 200,
+            "refine_drop_frac": 0.05,
+            "refine_tol": 0.01,
+            "refine_min_mass": 0.99,
+            "random_state": 42
+          },
+          "hpo": {
+            "backend": "optuna",
+            "n_trials": 5,
+            "timeout_s": 600.0,
+            "inner_cv": 3,
+            "models": null,
+            "keep_baseline": false,
+            "random_state": 42
+          },
+          "ensemble": {
+            "method": "caruana",
+            "size": 50,
+            "n_bags": 20,
+            "metric": null,
+            "random_state": 42
+          },
+          "significance": "bootstrap",
+          "run_mode": "full",
+          "model_types": [
+            "catboost",
+            "lightgbm"
+          ]
+        },
+        "source_sha256": {
+          "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+          "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+          "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+          "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+          "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+          "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+          "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+          "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+        }
+      }
+    }
+  ],
+  "final_runs": {
+    "otto": {
+      "baseline": [
+        {
+          "status": "completed",
+          "elapsed_s": 2372.2718958000187,
+          "metric": "log_loss",
+          "holdout_score": 0.4763246602908991,
+          "winner": "lightgbm",
+          "fit_counts": {
+            "attempted": 22,
+            "completed": 22,
+            "failed": 0
+          },
+          "config": {
+            "seed": 42,
+            "search": null,
+            "cv": {
+              "scheme": "stratified",
+              "n_splits": 5,
+              "n_test": 1,
+              "n_es": 1,
+              "purge": 0,
+              "embargo": 0,
+              "period": null,
+              "period_size": null,
+              "step_periods": null,
+              "purge_delta": null,
+              "embargo_delta": null,
+              "max_train_periods": null,
+              "max_train_size": null,
+              "weighting": "pooled",
+              "calibrate": "auto",
+              "selection": "raw",
+              "refinement_min_oof": 2000,
+              "outer_holdout": 0.2
+            },
+            "budget": {
+              "mode": "none",
+              "time_budget_s": null,
+              "n_trials": null,
+              "memory_limit_mb": null
+            },
+            "fe": {
+              "target_encoding": false,
+              "te_smoothing": 10.0,
+              "frequency_encoding": false,
+              "intersections": false,
+              "max_pairs": 50
+            },
+            "fs": null,
+            "hpo": null,
+            "ensemble": null,
+            "significance": "bootstrap",
+            "run_mode": "full",
+            "model_types": [
+              "catboost",
+              "lightgbm"
+            ]
+          },
+          "fit": 1,
+          "ensemble_applied": false,
+          "source_sha256": {
+            "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+            "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+            "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+            "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+            "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+            "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+            "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+            "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+          }
+        },
+        {
+          "status": "completed",
+          "elapsed_s": 1825.2338208999718,
+          "metric": "log_loss",
+          "holdout_score": 0.47478675507288126,
+          "winner": "lightgbm",
+          "fit_counts": {
+            "attempted": 67,
+            "completed": 67,
+            "failed": 0
+          },
+          "config": {
+            "seed": 42,
+            "search": null,
+            "cv": {
+              "scheme": "stratified",
+              "n_splits": 5,
+              "n_test": 1,
+              "n_es": 1,
+              "purge": 0,
+              "embargo": 0,
+              "period": null,
+              "period_size": null,
+              "step_periods": null,
+              "purge_delta": null,
+              "embargo_delta": null,
+              "max_train_periods": null,
+              "max_train_size": null,
+              "weighting": "pooled",
+              "calibrate": "auto",
+              "selection": "raw",
+              "refinement_min_oof": 2000,
+              "outer_holdout": 0.2
+            },
+            "budget": {
+              "mode": "none",
+              "time_budget_s": null,
+              "n_trials": null,
+              "memory_limit_mb": null
+            },
+            "fe": {
+              "target_encoding": false,
+              "te_smoothing": 10.0,
+              "frequency_encoding": false,
+              "intersections": false,
+              "max_pairs": 50
+            },
+            "fs": {
+              "strategy": "importance",
+              "compare": null,
+              "selection_holdout": 0.25,
+              "arbitration": "holdout",
+              "arbitration_n_splits": 5,
+              "null_block_size": 50,
+              "null_block_mode": "rank",
+              "null_block_window": null,
+              "shap_max_samples": null,
+              "shap_perturbation": "tree_path_dependent",
+              "shap_background_samples": null,
+              "shap_background": "linspace",
+              "cost_budget_refits": null,
+              "cutoff": "auto",
+              "top_k": null,
+              "top_frac": 0.5,
+              "min_features": 1,
+              "n_probes": 3,
+              "n_runs": 30,
+              "null_percentile": 95.0,
+              "seq_min_features": 1,
+              "seq_patience": 2,
+              "refine": true,
+              "refine_max_features": 200,
+              "refine_drop_frac": 0.05,
+              "refine_tol": 0.01,
+              "refine_min_mass": 0.99,
+              "random_state": 42
+            },
+            "hpo": {
+              "backend": "optuna",
+              "n_trials": 5,
+              "timeout_s": 900.0,
+              "inner_cv": 3,
+              "models": null,
+              "keep_baseline": false,
+              "random_state": 42
+            },
+            "ensemble": {
+              "method": "caruana",
+              "size": 50,
+              "n_bags": 20,
+              "metric": null,
+              "random_state": 42
+            },
+            "significance": "bootstrap",
+            "run_mode": "full",
+            "model_types": [
+              "catboost",
+              "lightgbm"
+            ]
+          },
+          "fit": 2,
+          "ensemble_applied": false,
+          "source_sha256": {
+            "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+            "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+            "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+            "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+            "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+            "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+            "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+            "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+          }
+        }
+      ],
+      "frozen_fast": [
+        {
+          "status": "completed",
+          "elapsed_s": 8487.017258599983,
+          "metric": "log_loss",
+          "holdout_score": 0.5009281140476991,
+          "winner": "catboost",
+          "fit_counts": {
+            "attempted": 15,
+            "completed": 15,
+            "failed": 0
+          },
+          "config": {
+            "seed": 42,
+            "search": {
+              "max_rows": 4096,
+              "max_features": 64,
+              "model_iterations": 64,
+              "max_folds": 1,
+              "max_probe_fits": 64,
+              "confirmation_rows": 16384,
+              "confirmation_iterations": 256,
+              "confirmation_folds": 2,
+              "min_es_rows": 10,
+              "min_class_count": 5,
+              "model_margin": 0.0,
+              "max_fs_fits": 64,
+              "reserve_fraction": 0.3,
+              "probe_fraction": 0.2,
+              "threads": 4
+            },
+            "cv": {
+              "scheme": "stratified",
+              "n_splits": 5,
+              "n_test": 1,
+              "n_es": 1,
+              "purge": 0,
+              "embargo": 0,
+              "period": null,
+              "period_size": null,
+              "step_periods": null,
+              "purge_delta": null,
+              "embargo_delta": null,
+              "max_train_periods": null,
+              "max_train_size": null,
+              "weighting": "pooled",
+              "calibrate": "auto",
+              "selection": "raw",
+              "refinement_min_oof": 2000,
+              "outer_holdout": 0.2
+            },
+            "budget": {
+              "mode": "none",
+              "time_budget_s": null,
+              "n_trials": null,
+              "memory_limit_mb": null
+            },
+            "fe": {
+              "target_encoding": false,
+              "te_smoothing": 10.0,
+              "frequency_encoding": false,
+              "intersections": false,
+              "max_pairs": 50
+            },
+            "fs": null,
+            "hpo": null,
+            "ensemble": null,
+            "significance": "bootstrap",
+            "run_mode": "full",
+            "model_types": [
+              "catboost",
+              "lightgbm"
+            ]
+          },
+          "fit": 1,
+          "ensemble_applied": false,
+          "source_sha256": {
+            "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+            "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+            "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+            "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+            "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+            "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+            "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+            "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+          }
+        },
+        {
+          "status": "completed",
+          "elapsed_s": 4955.656060399953,
+          "metric": "log_loss",
+          "holdout_score": 0.5009281140476991,
+          "winner": "catboost",
+          "fit_counts": {
+            "attempted": 40,
+            "completed": 40,
+            "failed": 0
+          },
+          "config": {
+            "seed": 42,
+            "search": {
+              "max_rows": 4096,
+              "max_features": 64,
+              "model_iterations": 64,
+              "max_folds": 1,
+              "max_probe_fits": 64,
+              "confirmation_rows": 16384,
+              "confirmation_iterations": 256,
+              "confirmation_folds": 2,
+              "min_es_rows": 10,
+              "min_class_count": 5,
+              "model_margin": 0.0,
+              "max_fs_fits": 64,
+              "reserve_fraction": 0.3,
+              "probe_fraction": 0.2,
+              "threads": 4
+            },
+            "cv": {
+              "scheme": "stratified",
+              "n_splits": 5,
+              "n_test": 1,
+              "n_es": 1,
+              "purge": 0,
+              "embargo": 0,
+              "period": null,
+              "period_size": null,
+              "step_periods": null,
+              "purge_delta": null,
+              "embargo_delta": null,
+              "max_train_periods": null,
+              "max_train_size": null,
+              "weighting": "pooled",
+              "calibrate": "auto",
+              "selection": "raw",
+              "refinement_min_oof": 2000,
+              "outer_holdout": 0.2
+            },
+            "budget": {
+              "mode": "none",
+              "time_budget_s": null,
+              "n_trials": null,
+              "memory_limit_mb": null
+            },
+            "fe": {
+              "target_encoding": false,
+              "te_smoothing": 10.0,
+              "frequency_encoding": false,
+              "intersections": false,
+              "max_pairs": 50
+            },
+            "fs": {
+              "strategy": "importance",
+              "compare": null,
+              "selection_holdout": 0.25,
+              "arbitration": "holdout",
+              "arbitration_n_splits": 5,
+              "null_block_size": 50,
+              "null_block_mode": "rank",
+              "null_block_window": null,
+              "shap_max_samples": null,
+              "shap_perturbation": "tree_path_dependent",
+              "shap_background_samples": null,
+              "shap_background": "linspace",
+              "cost_budget_refits": null,
+              "cutoff": "auto",
+              "top_k": null,
+              "top_frac": 0.5,
+              "min_features": 1,
+              "n_probes": 3,
+              "n_runs": 30,
+              "null_percentile": 95.0,
+              "seq_min_features": 1,
+              "seq_patience": 2,
+              "refine": true,
+              "refine_max_features": 200,
+              "refine_drop_frac": 0.05,
+              "refine_tol": 0.01,
+              "refine_min_mass": 0.99,
+              "random_state": 42
+            },
+            "hpo": {
+              "backend": "optuna",
+              "n_trials": 5,
+              "timeout_s": 900.0,
+              "inner_cv": 3,
+              "models": null,
+              "keep_baseline": false,
+              "random_state": 42
+            },
+            "ensemble": {
+              "method": "caruana",
+              "size": 50,
+              "n_bags": 20,
+              "metric": null,
+              "random_state": 42
+            },
+            "significance": "bootstrap",
+            "run_mode": "full",
+            "model_types": [
+              "catboost",
+              "lightgbm"
+            ]
+          },
+          "fit": 2,
+          "ensemble_applied": false,
+          "source_sha256": {
+            "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+            "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+            "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+            "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+            "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+            "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+            "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+            "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+          }
+        }
+      ],
+      "final_fast": [
+        {
+          "status": "completed",
+          "elapsed_s": 196.6375168999657,
+          "metric": "log_loss",
+          "holdout_score": 0.4763246602908991,
+          "winner": "lightgbm",
+          "fit_counts": {
+            "attempted": 15,
+            "completed": 15,
+            "failed": 0
+          },
+          "config": {
+            "seed": 42,
+            "search": {
+              "max_rows": 4096,
+              "max_features": 64,
+              "model_iterations": 64,
+              "max_folds": 1,
+              "max_probe_fits": 64,
+              "confirmation_rows": 65536,
+              "confirmation_iterations": 256,
+              "confirmation_folds": 2,
+              "min_es_rows": 10,
+              "min_class_count": 5,
+              "model_margin": 0.0,
+              "max_fs_fits": 64,
+              "reserve_fraction": 0.3,
+              "probe_fraction": 0.2,
+              "threads": 4
+            },
+            "cv": {
+              "scheme": "stratified",
+              "n_splits": 5,
+              "n_test": 1,
+              "n_es": 1,
+              "purge": 0,
+              "embargo": 0,
+              "period": null,
+              "period_size": null,
+              "step_periods": null,
+              "purge_delta": null,
+              "embargo_delta": null,
+              "max_train_periods": null,
+              "max_train_size": null,
+              "weighting": "pooled",
+              "calibrate": "auto",
+              "selection": "raw",
+              "refinement_min_oof": 2000,
+              "outer_holdout": 0.2
+            },
+            "budget": {
+              "mode": "none",
+              "time_budget_s": null,
+              "n_trials": null,
+              "memory_limit_mb": null
+            },
+            "fe": {
+              "target_encoding": false,
+              "te_smoothing": 10.0,
+              "frequency_encoding": false,
+              "intersections": false,
+              "max_pairs": 50
+            },
+            "fs": null,
+            "hpo": null,
+            "ensemble": null,
+            "significance": "bootstrap",
+            "run_mode": "full",
+            "model_types": [
+              "catboost",
+              "lightgbm"
+            ]
+          },
+          "fit": 1,
+          "ensemble_applied": false,
+          "source_sha256": {
+            "benchmarks/search_diagnostics.py": "ebd66329a7f1b8425d02fd173643060e708166dbfd5351265020d9060a4f4d24",
+            "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+            "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+            "src/honestml/core/config.py": "7a86fcee0a8d1f1f1deb69acad681636126360b2e7d5687858708da0241d005b",
+            "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+            "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+            "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+            "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+          }
+        },
+        {
+          "status": "completed",
+          "elapsed_s": 266.57015479996335,
+          "metric": "log_loss",
+          "holdout_score": 0.4763246602908991,
+          "winner": "lightgbm",
+          "fit_counts": {
+            "attempted": 40,
+            "completed": 40,
+            "failed": 0
+          },
+          "config": {
+            "seed": 42,
+            "search": {
+              "max_rows": 4096,
+              "max_features": 64,
+              "model_iterations": 64,
+              "max_folds": 1,
+              "max_probe_fits": 64,
+              "confirmation_rows": 65536,
+              "confirmation_iterations": 256,
+              "confirmation_folds": 2,
+              "min_es_rows": 10,
+              "min_class_count": 5,
+              "model_margin": 0.0,
+              "max_fs_fits": 64,
+              "reserve_fraction": 0.3,
+              "probe_fraction": 0.2,
+              "threads": 4
+            },
+            "cv": {
+              "scheme": "stratified",
+              "n_splits": 5,
+              "n_test": 1,
+              "n_es": 1,
+              "purge": 0,
+              "embargo": 0,
+              "period": null,
+              "period_size": null,
+              "step_periods": null,
+              "purge_delta": null,
+              "embargo_delta": null,
+              "max_train_periods": null,
+              "max_train_size": null,
+              "weighting": "pooled",
+              "calibrate": "auto",
+              "selection": "raw",
+              "refinement_min_oof": 2000,
+              "outer_holdout": 0.2
+            },
+            "budget": {
+              "mode": "none",
+              "time_budget_s": null,
+              "n_trials": null,
+              "memory_limit_mb": null
+            },
+            "fe": {
+              "target_encoding": false,
+              "te_smoothing": 10.0,
+              "frequency_encoding": false,
+              "intersections": false,
+              "max_pairs": 50
+            },
+            "fs": {
+              "strategy": "importance",
+              "compare": null,
+              "selection_holdout": 0.25,
+              "arbitration": "holdout",
+              "arbitration_n_splits": 5,
+              "null_block_size": 50,
+              "null_block_mode": "rank",
+              "null_block_window": null,
+              "shap_max_samples": null,
+              "shap_perturbation": "tree_path_dependent",
+              "shap_background_samples": null,
+              "shap_background": "linspace",
+              "cost_budget_refits": null,
+              "cutoff": "auto",
+              "top_k": null,
+              "top_frac": 0.5,
+              "min_features": 1,
+              "n_probes": 3,
+              "n_runs": 30,
+              "null_percentile": 95.0,
+              "seq_min_features": 1,
+              "seq_patience": 2,
+              "refine": true,
+              "refine_max_features": 200,
+              "refine_drop_frac": 0.05,
+              "refine_tol": 0.01,
+              "refine_min_mass": 0.99,
+              "random_state": 42
+            },
+            "hpo": {
+              "backend": "optuna",
+              "n_trials": 5,
+              "timeout_s": 900.0,
+              "inner_cv": 3,
+              "models": null,
+              "keep_baseline": false,
+              "random_state": 42
+            },
+            "ensemble": {
+              "method": "caruana",
+              "size": 50,
+              "n_bags": 20,
+              "metric": null,
+              "random_state": 42
+            },
+            "significance": "bootstrap",
+            "run_mode": "full",
+            "model_types": [
+              "catboost",
+              "lightgbm"
+            ]
+          },
+          "fit": 2,
+          "ensemble_applied": false,
+          "source_sha256": {
+            "benchmarks/search_diagnostics.py": "ebd66329a7f1b8425d02fd173643060e708166dbfd5351265020d9060a4f4d24",
+            "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+            "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+            "src/honestml/core/config.py": "7a86fcee0a8d1f1f1deb69acad681636126360b2e7d5687858708da0241d005b",
+            "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+            "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+            "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+            "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+          }
+        }
+      ]
+    },
+    "home": {
+      "baseline": [
+        {
+          "status": "completed",
+          "elapsed_s": 757.1847720999504,
+          "metric": "roc_auc",
+          "holdout_score": 0.7752502350713616,
+          "winner": "catboost",
+          "fit_counts": {
+            "attempted": 22,
+            "completed": 22,
+            "failed": 0
+          },
+          "config": {
+            "seed": 42,
+            "search": null,
+            "cv": {
+              "scheme": "stratified",
+              "n_splits": 5,
+              "n_test": 1,
+              "n_es": 1,
+              "purge": 0,
+              "embargo": 0,
+              "period": null,
+              "period_size": null,
+              "step_periods": null,
+              "purge_delta": null,
+              "embargo_delta": null,
+              "max_train_periods": null,
+              "max_train_size": null,
+              "weighting": "pooled",
+              "calibrate": "auto",
+              "selection": "raw",
+              "refinement_min_oof": 2000,
+              "outer_holdout": 0.2
+            },
+            "budget": {
+              "mode": "none",
+              "time_budget_s": null,
+              "n_trials": null,
+              "memory_limit_mb": null
+            },
+            "fe": {
+              "target_encoding": false,
+              "te_smoothing": 10.0,
+              "frequency_encoding": false,
+              "intersections": false,
+              "max_pairs": 50
+            },
+            "fs": null,
+            "hpo": null,
+            "ensemble": null,
+            "significance": "bootstrap",
+            "run_mode": "full",
+            "model_types": [
+              "catboost",
+              "lightgbm"
+            ]
+          },
+          "source_sha256": {
+            "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+            "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+            "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+            "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+            "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+            "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+            "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+            "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+          },
+          "fit": 1,
+          "ensemble_applied": false
+        },
+        {
+          "status": "completed",
+          "elapsed_s": 863.1292467999738,
+          "metric": "roc_auc",
+          "holdout_score": 0.7792418125657569,
+          "winner": "lightgbm",
+          "fit_counts": {
+            "attempted": 73,
+            "completed": 73,
+            "failed": 0
+          },
+          "config": {
+            "seed": 42,
+            "search": null,
+            "cv": {
+              "scheme": "stratified",
+              "n_splits": 5,
+              "n_test": 1,
+              "n_es": 1,
+              "purge": 0,
+              "embargo": 0,
+              "period": null,
+              "period_size": null,
+              "step_periods": null,
+              "purge_delta": null,
+              "embargo_delta": null,
+              "max_train_periods": null,
+              "max_train_size": null,
+              "weighting": "pooled",
+              "calibrate": "auto",
+              "selection": "raw",
+              "refinement_min_oof": 2000,
+              "outer_holdout": 0.2
+            },
+            "budget": {
+              "mode": "none",
+              "time_budget_s": null,
+              "n_trials": null,
+              "memory_limit_mb": null
+            },
+            "fe": {
+              "target_encoding": false,
+              "te_smoothing": 10.0,
+              "frequency_encoding": false,
+              "intersections": false,
+              "max_pairs": 50
+            },
+            "fs": {
+              "strategy": "importance",
+              "compare": null,
+              "selection_holdout": 0.25,
+              "arbitration": "holdout",
+              "arbitration_n_splits": 5,
+              "null_block_size": 50,
+              "null_block_mode": "rank",
+              "null_block_window": null,
+              "shap_max_samples": null,
+              "shap_perturbation": "tree_path_dependent",
+              "shap_background_samples": null,
+              "shap_background": "linspace",
+              "cost_budget_refits": null,
+              "cutoff": "auto",
+              "top_k": null,
+              "top_frac": 0.5,
+              "min_features": 1,
+              "n_probes": 3,
+              "n_runs": 30,
+              "null_percentile": 95.0,
+              "seq_min_features": 1,
+              "seq_patience": 2,
+              "refine": true,
+              "refine_max_features": 200,
+              "refine_drop_frac": 0.05,
+              "refine_tol": 0.01,
+              "refine_min_mass": 0.99,
+              "random_state": 42
+            },
+            "hpo": {
+              "backend": "optuna",
+              "n_trials": 5,
+              "timeout_s": 600.0,
+              "inner_cv": 3,
+              "models": null,
+              "keep_baseline": false,
+              "random_state": 42
+            },
+            "ensemble": {
+              "method": "caruana",
+              "size": 50,
+              "n_bags": 20,
+              "metric": null,
+              "random_state": 42
+            },
+            "significance": "bootstrap",
+            "run_mode": "full",
+            "model_types": [
+              "catboost",
+              "lightgbm"
+            ]
+          },
+          "source_sha256": {
+            "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+            "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+            "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+            "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+            "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+            "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+            "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+            "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+          },
+          "fit": 2,
+          "ensemble_applied": true
+        }
+      ],
+      "frozen_fast": [
+        {
+          "status": "completed",
+          "elapsed_s": 616.9496608999325,
+          "metric": "roc_auc",
+          "holdout_score": 0.7752502350713616,
+          "winner": "catboost",
+          "fit_counts": {
+            "attempted": 15,
+            "completed": 15,
+            "failed": 0
+          },
+          "config": {
+            "seed": 42,
+            "search": {
+              "max_rows": 4096,
+              "max_features": 64,
+              "model_iterations": 64,
+              "max_folds": 1,
+              "max_probe_fits": 64,
+              "confirmation_rows": 16384,
+              "confirmation_iterations": 256,
+              "confirmation_folds": 2,
+              "min_es_rows": 10,
+              "min_class_count": 5,
+              "model_margin": 0.0,
+              "max_fs_fits": 64,
+              "reserve_fraction": 0.3,
+              "probe_fraction": 0.2,
+              "threads": 4
+            },
+            "cv": {
+              "scheme": "stratified",
+              "n_splits": 5,
+              "n_test": 1,
+              "n_es": 1,
+              "purge": 0,
+              "embargo": 0,
+              "period": null,
+              "period_size": null,
+              "step_periods": null,
+              "purge_delta": null,
+              "embargo_delta": null,
+              "max_train_periods": null,
+              "max_train_size": null,
+              "weighting": "pooled",
+              "calibrate": "auto",
+              "selection": "raw",
+              "refinement_min_oof": 2000,
+              "outer_holdout": 0.2
+            },
+            "budget": {
+              "mode": "none",
+              "time_budget_s": null,
+              "n_trials": null,
+              "memory_limit_mb": null
+            },
+            "fe": {
+              "target_encoding": false,
+              "te_smoothing": 10.0,
+              "frequency_encoding": false,
+              "intersections": false,
+              "max_pairs": 50
+            },
+            "fs": null,
+            "hpo": null,
+            "ensemble": null,
+            "significance": "bootstrap",
+            "run_mode": "full",
+            "model_types": [
+              "catboost",
+              "lightgbm"
+            ]
+          },
+          "source_sha256": {
+            "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+            "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+            "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+            "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+            "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+            "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+            "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+            "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+          },
+          "fit": 1,
+          "ensemble_applied": false
+        },
+        {
+          "status": "completed",
+          "elapsed_s": 1013.3948634000262,
+          "metric": "roc_auc",
+          "holdout_score": 0.7752502350713616,
+          "winner": "catboost",
+          "fit_counts": {
+            "attempted": 40,
+            "completed": 40,
+            "failed": 0
+          },
+          "config": {
+            "seed": 42,
+            "search": {
+              "max_rows": 4096,
+              "max_features": 64,
+              "model_iterations": 64,
+              "max_folds": 1,
+              "max_probe_fits": 64,
+              "confirmation_rows": 16384,
+              "confirmation_iterations": 256,
+              "confirmation_folds": 2,
+              "min_es_rows": 10,
+              "min_class_count": 5,
+              "model_margin": 0.0,
+              "max_fs_fits": 64,
+              "reserve_fraction": 0.3,
+              "probe_fraction": 0.2,
+              "threads": 4
+            },
+            "cv": {
+              "scheme": "stratified",
+              "n_splits": 5,
+              "n_test": 1,
+              "n_es": 1,
+              "purge": 0,
+              "embargo": 0,
+              "period": null,
+              "period_size": null,
+              "step_periods": null,
+              "purge_delta": null,
+              "embargo_delta": null,
+              "max_train_periods": null,
+              "max_train_size": null,
+              "weighting": "pooled",
+              "calibrate": "auto",
+              "selection": "raw",
+              "refinement_min_oof": 2000,
+              "outer_holdout": 0.2
+            },
+            "budget": {
+              "mode": "none",
+              "time_budget_s": null,
+              "n_trials": null,
+              "memory_limit_mb": null
+            },
+            "fe": {
+              "target_encoding": false,
+              "te_smoothing": 10.0,
+              "frequency_encoding": false,
+              "intersections": false,
+              "max_pairs": 50
+            },
+            "fs": {
+              "strategy": "importance",
+              "compare": null,
+              "selection_holdout": 0.25,
+              "arbitration": "holdout",
+              "arbitration_n_splits": 5,
+              "null_block_size": 50,
+              "null_block_mode": "rank",
+              "null_block_window": null,
+              "shap_max_samples": null,
+              "shap_perturbation": "tree_path_dependent",
+              "shap_background_samples": null,
+              "shap_background": "linspace",
+              "cost_budget_refits": null,
+              "cutoff": "auto",
+              "top_k": null,
+              "top_frac": 0.5,
+              "min_features": 1,
+              "n_probes": 3,
+              "n_runs": 30,
+              "null_percentile": 95.0,
+              "seq_min_features": 1,
+              "seq_patience": 2,
+              "refine": true,
+              "refine_max_features": 200,
+              "refine_drop_frac": 0.05,
+              "refine_tol": 0.01,
+              "refine_min_mass": 0.99,
+              "random_state": 42
+            },
+            "hpo": {
+              "backend": "optuna",
+              "n_trials": 5,
+              "timeout_s": 600.0,
+              "inner_cv": 3,
+              "models": null,
+              "keep_baseline": false,
+              "random_state": 42
+            },
+            "ensemble": {
+              "method": "caruana",
+              "size": 50,
+              "n_bags": 20,
+              "metric": null,
+              "random_state": 42
+            },
+            "significance": "bootstrap",
+            "run_mode": "full",
+            "model_types": [
+              "catboost",
+              "lightgbm"
+            ]
+          },
+          "source_sha256": {
+            "benchmarks/search_diagnostics.py": "3f25b5c1c3cf8c5b09f49957735ee261f772bde1fb62a31be670c776cab32475",
+            "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+            "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+            "src/honestml/core/config.py": "24d4e33b9fa448e756ca7fa7bf80b98539aa7d6c84348c1f46899324da7f73de",
+            "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+            "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+            "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+            "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+          },
+          "fit": 2,
+          "ensemble_applied": false
+        }
+      ],
+      "final_fast": [
+        {
+          "status": "completed",
+          "elapsed_s": 623.8183308000444,
+          "metric": "roc_auc",
+          "holdout_score": 0.7752502350713616,
+          "winner": "catboost",
+          "fit_counts": {
+            "attempted": 15,
+            "completed": 15,
+            "failed": 0
+          },
+          "config": {
+            "seed": 42,
+            "search": {
+              "max_rows": 4096,
+              "max_features": 64,
+              "model_iterations": 64,
+              "max_folds": 1,
+              "max_probe_fits": 64,
+              "confirmation_rows": 65536,
+              "confirmation_iterations": 256,
+              "confirmation_folds": 2,
+              "min_es_rows": 10,
+              "min_class_count": 5,
+              "model_margin": 0.0,
+              "max_fs_fits": 64,
+              "reserve_fraction": 0.3,
+              "probe_fraction": 0.2,
+              "threads": 4
+            },
+            "cv": {
+              "scheme": "stratified",
+              "n_splits": 5,
+              "n_test": 1,
+              "n_es": 1,
+              "purge": 0,
+              "embargo": 0,
+              "period": null,
+              "period_size": null,
+              "step_periods": null,
+              "purge_delta": null,
+              "embargo_delta": null,
+              "max_train_periods": null,
+              "max_train_size": null,
+              "weighting": "pooled",
+              "calibrate": "auto",
+              "selection": "raw",
+              "refinement_min_oof": 2000,
+              "outer_holdout": 0.2
+            },
+            "budget": {
+              "mode": "none",
+              "time_budget_s": null,
+              "n_trials": null,
+              "memory_limit_mb": null
+            },
+            "fe": {
+              "target_encoding": false,
+              "te_smoothing": 10.0,
+              "frequency_encoding": false,
+              "intersections": false,
+              "max_pairs": 50
+            },
+            "fs": null,
+            "hpo": null,
+            "ensemble": null,
+            "significance": "bootstrap",
+            "run_mode": "full",
+            "model_types": [
+              "catboost",
+              "lightgbm"
+            ]
+          },
+          "source_sha256": {
+            "benchmarks/search_diagnostics.py": "ebd66329a7f1b8425d02fd173643060e708166dbfd5351265020d9060a4f4d24",
+            "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+            "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+            "src/honestml/core/config.py": "7a86fcee0a8d1f1f1deb69acad681636126360b2e7d5687858708da0241d005b",
+            "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+            "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+            "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+            "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+          },
+          "fit": 1,
+          "ensemble_applied": false
+        },
+        {
+          "status": "completed",
+          "elapsed_s": 981.6232614000328,
+          "metric": "roc_auc",
+          "holdout_score": 0.7752502350713616,
+          "winner": "catboost",
+          "fit_counts": {
+            "attempted": 40,
+            "completed": 40,
+            "failed": 0
+          },
+          "config": {
+            "seed": 42,
+            "search": {
+              "max_rows": 4096,
+              "max_features": 64,
+              "model_iterations": 64,
+              "max_folds": 1,
+              "max_probe_fits": 64,
+              "confirmation_rows": 65536,
+              "confirmation_iterations": 256,
+              "confirmation_folds": 2,
+              "min_es_rows": 10,
+              "min_class_count": 5,
+              "model_margin": 0.0,
+              "max_fs_fits": 64,
+              "reserve_fraction": 0.3,
+              "probe_fraction": 0.2,
+              "threads": 4
+            },
+            "cv": {
+              "scheme": "stratified",
+              "n_splits": 5,
+              "n_test": 1,
+              "n_es": 1,
+              "purge": 0,
+              "embargo": 0,
+              "period": null,
+              "period_size": null,
+              "step_periods": null,
+              "purge_delta": null,
+              "embargo_delta": null,
+              "max_train_periods": null,
+              "max_train_size": null,
+              "weighting": "pooled",
+              "calibrate": "auto",
+              "selection": "raw",
+              "refinement_min_oof": 2000,
+              "outer_holdout": 0.2
+            },
+            "budget": {
+              "mode": "none",
+              "time_budget_s": null,
+              "n_trials": null,
+              "memory_limit_mb": null
+            },
+            "fe": {
+              "target_encoding": false,
+              "te_smoothing": 10.0,
+              "frequency_encoding": false,
+              "intersections": false,
+              "max_pairs": 50
+            },
+            "fs": {
+              "strategy": "importance",
+              "compare": null,
+              "selection_holdout": 0.25,
+              "arbitration": "holdout",
+              "arbitration_n_splits": 5,
+              "null_block_size": 50,
+              "null_block_mode": "rank",
+              "null_block_window": null,
+              "shap_max_samples": null,
+              "shap_perturbation": "tree_path_dependent",
+              "shap_background_samples": null,
+              "shap_background": "linspace",
+              "cost_budget_refits": null,
+              "cutoff": "auto",
+              "top_k": null,
+              "top_frac": 0.5,
+              "min_features": 1,
+              "n_probes": 3,
+              "n_runs": 30,
+              "null_percentile": 95.0,
+              "seq_min_features": 1,
+              "seq_patience": 2,
+              "refine": true,
+              "refine_max_features": 200,
+              "refine_drop_frac": 0.05,
+              "refine_tol": 0.01,
+              "refine_min_mass": 0.99,
+              "random_state": 42
+            },
+            "hpo": {
+              "backend": "optuna",
+              "n_trials": 5,
+              "timeout_s": 600.0,
+              "inner_cv": 3,
+              "models": null,
+              "keep_baseline": false,
+              "random_state": 42
+            },
+            "ensemble": {
+              "method": "caruana",
+              "size": 50,
+              "n_bags": 20,
+              "metric": null,
+              "random_state": 42
+            },
+            "significance": "bootstrap",
+            "run_mode": "full",
+            "model_types": [
+              "catboost",
+              "lightgbm"
+            ]
+          },
+          "source_sha256": {
+            "benchmarks/search_diagnostics.py": "ebd66329a7f1b8425d02fd173643060e708166dbfd5351265020d9060a4f4d24",
+            "src/honestml/application/search.py": "14815c42574a1e73415ef196f1fbcfcdda3978eba1dcf61ea60166c74a6a11ae",
+            "src/honestml/application/slice.py": "86f6b6f586dbd430dee1f663fb3457564b9436fb8f1d0094abe6b322ab9f8e7d",
+            "src/honestml/core/config.py": "7a86fcee0a8d1f1f1deb69acad681636126360b2e7d5687858708da0241d005b",
+            "src/honestml/composition/facade.py": "09c78c0324073dcd12458e5a9e5df25551d3eee93c3bc10fc6a5f17717fb7f5d",
+            "src/honestml/adapters/boosting.py": "ee839785dfc9aabd77fd68472e84325e3d9555687aba161c553703ffe11af9cf",
+            "src/honestml/adapters/feature_rankers.py": "abd27eb3cfedf499b589f5773592d8b97f4404975e77d88df436b17b1b623417",
+            "src/honestml/adapters/significance.py": "a34a5253c17492bbd95c94bc620a8e021243e5ffd44d3621c1d77394d18e6610"
+          },
+          "fit": 2,
+          "ensemble_applied": false
+        }
+      ]
+    }
+  },
+  "source_report_sha256": {
+    "comparison.json": "9c4f6e296848d93594c4a7c16ef172ade44cdbe0e317f2c9350e53a0470db40d",
+    "final-otto-analysis.json": "da696ef8153e25787b8c7e36b92e666deb1617dd5354168dd9ac4fc8a3f41cbb",
+    "final-home-analysis.json": "ef8b548534ac7984d0bcdf862dd84f4a3ddc0c7683e0ed5e011f26e57b021d0a",
+    "fs-pairs-analysis.json": "f8d5ddf300cfc329775485c45d69422c599af9e82653401288f9bd503d82fd97",
+    "final-fixed-family-analysis.json": "b81223d2a3c759de7cf5e13ccc34833e09eacd4bd86a7c989be554196a789318",
+    "store-third-fit-analysis.json": "db8886d13fed0f4aa871bbff014dad11e541b28541f3e87b53172f18823f5656",
+    "store-baseline-repeat-analysis.json": "83a211756c595fd80be01473211a2d1221f0e0fefd062ad568eab1c506f9fcda",
+    "ieee-baseline-analysis.json": "26ef9aef639783765c93050c4074f117fc8a366dddb38df236754585ee26a4e0"
+  }
+}

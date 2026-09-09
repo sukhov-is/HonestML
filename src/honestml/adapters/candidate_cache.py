@@ -31,7 +31,7 @@ from honestml.core import get_logger
 if TYPE_CHECKING:
     from honestml.core import Candidate
 
-CACHE_VERSION = 1
+CACHE_VERSION = 2
 _ENTRY_FILE = "entry.joblib"
 _META_FILE = "meta.json"
 
@@ -72,6 +72,47 @@ class JoblibCandidateCache:
         joblib.dump(candidate, tmp_entry)
         os.replace(tmp_entry, entry_dir / _ENTRY_FILE)
         self._commit_meta(entry_dir, candidate_id)
+
+    def get_stage(self, stage: str) -> object | None:
+        """Load a completed stage from the trusted run-scoped cache."""
+        import pickle
+
+        import joblib
+
+        directory = self._root / "_stages" / Path(stage).name
+        marker = directory / _META_FILE
+        if not marker.exists():
+            return None
+        try:
+            meta = json.loads(marker.read_text(encoding="utf-8"))
+            if meta.get("cache_version") != CACHE_VERSION or meta.get("candidate_id") != stage:
+                return None
+            return joblib.load(directory / _ENTRY_FILE)
+        except (
+            OSError,
+            ValueError,
+            EOFError,
+            pickle.UnpicklingError,
+            KeyError,
+            TypeError,
+            IndexError,
+            AttributeError,
+            ImportError,
+        ) as exc:
+            logger.warning("stage cache %r unreadable (%s); recomputing", stage, exc)
+            return None
+
+    def put_stage(self, stage: str, value: object) -> None:
+        """Atomically publish a completed stage; an interrupted replacement is a miss."""
+        import joblib
+
+        directory = self._root / "_stages" / Path(stage).name
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / _META_FILE).unlink(missing_ok=True)
+        temporary = self._tmp(directory, _ENTRY_FILE)
+        joblib.dump(value, temporary)
+        os.replace(temporary, directory / _ENTRY_FILE)
+        self._commit_meta(directory, stage)
 
     def _commit_meta(self, entry_dir: Path, candidate_id: str) -> None:
         """Write ``meta.json`` (the commit-marker) atomically and LAST — a testable crash seam.

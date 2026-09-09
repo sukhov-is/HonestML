@@ -26,7 +26,16 @@ venv/
 .idea/
 .vscode/
 .DS_Store
-.CLAUDE/
+
+# agent harness runtime state
+ops/loop/logs/
+ops/loop/metrics.jsonl
+ops/loop/hook-audit.log
+ops/loop/notify.json
+docs/loop/STOP
+docs/loop/STOP-NOW
+.CLAUDE/skills/*-workspace/
+.agents/skills/*-workspace/
 
 # local working files, not for publication
 _legacy/
@@ -38,8 +47,10 @@ benchmarks/native_cat_gate_results.json
 notebooks/data/
 notebooks/results/
 notebooks/.ipynb_checkpoints/
+notebooks/test/
 
 # internal design/architecture packages (kept local, not published)
 docs/architecture/
 docs/audit/
 docs/implementation/
+blog/

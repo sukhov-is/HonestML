@@ -375,12 +375,47 @@ class TrackerConfig(BaseModel):
     tags: dict[str, str] = Field(default_factory=dict)
 
 
+class SearchConfig(BaseModel):
+    """Bounded preliminary model and multistage feature-recipe selection."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    max_rows: int = Field(default=4096, ge=32)
+    max_features: int = Field(default=64, ge=1)
+    model_iterations: int = Field(default=64, ge=1)
+    max_folds: int = Field(default=1, ge=1)
+    max_probe_fits: int = Field(default=64, ge=1)
+    confirmation_rows: int = Field(default=65536, ge=32)
+    confirmation_iterations: int = Field(default=256, ge=1)
+    confirmation_folds: int = Field(default=2, ge=1)
+    min_es_rows: int = Field(default=10, ge=1)
+    min_class_count: int = Field(default=5, ge=1)
+    model_margin: float = Field(default=0.0, ge=0.0)
+    max_fs_fits: int = Field(default=64, ge=1)
+    reserve_fraction: float = Field(default=0.3, gt=0.0, lt=1.0)
+    probe_fraction: float = Field(default=0.2, gt=0.0, lt=1.0)
+    threads: int = Field(default=1, ge=1)
+
+    @model_validator(mode="after")
+    def _check_fractions(self) -> SearchConfig:
+        if self.reserve_fraction + self.probe_fraction >= 1.0:
+            raise ValueError("probe_fraction + reserve_fraction must be less than 1")
+        if (
+            self.confirmation_rows < self.max_rows
+            or self.confirmation_iterations < self.model_iterations
+            or self.confirmation_folds < self.max_folds
+        ):
+            raise ValueError("confirmation resource must be at least the initial probe resource")
+        return self
+
+
 class RunConfig(BaseModel):
     """Top-level run configuration; serializable basis of the run manifest."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     seed: int = 42
+    search: SearchConfig | None = None
     cv: CVConfig = Field(default_factory=CVConfig)
     budget: BudgetConfig = Field(default_factory=BudgetConfig)
     # feature-engineering catalog (ADR-0040 §4): default all-off -> M5 unchanged; in the run-fingerprint

@@ -5,10 +5,14 @@ classification and regression. It is built around a clean, extensible core:
 pluggable models, metrics, cross-validation, feature engineering/selection,
 tuning, ensembling, serving and tracking.
 
-The differentiator is the **honestly best model**: out-of-fold selection with a
-bootstrap equivalence band, leakage-controlled feature engineering and
-selection, an optional untouched outer holdout, and a tracker-independent run
-report — the score you see is the score you can expect in production.
+Выбор использует OOF-оценки, bootstrap-полосу эквивалентности и контроль
+подготовки признаков. Отчёт разделяет DEV-оценку после поиска и внешний holdout.
+Качество на новых данных требует независимой приёмки; просмотренный holdout
+не является нетронутым тестом последующих изменений.
+
+`search=SearchConfig(...)` включает ограниченные пробы семейств и FS с широким
+контролем. [Руководство по стоимости обучения](training-performance.md) описывает
+условный прогноз FS/HPO и открытые границы его точности.
 
 ```bash
 pip install honestml

@@ -19,19 +19,24 @@ nav:
       - Hyperparameter tuning and ensembling: guide/hpo-ensembling.md
       - Run reports and experiment tracking: guide/reports-tracking.md
       - Artifacts, serving and ONNX export: guide/artifacts-serving.md
+  - Training performance:
+      - Search and cost: training-performance.md
+      - Recorded results: training-results.md
+      - Improvement plan: training-performance-improvements.md
+      - Roadmap: training-performance-roadmap.md
   - API reference: api.md
   - Correctness guide: correctness-guide.md
   - Plugin contract: plugin-contract.md
   - Releasing: releasing.md
   - Versioning policy: versioning-policy.md
 
-# Internal records present in the docs tree but NOT built as site pages: ADRs and the
-# design/architecture packages are committed; the backlog and audit notes stay local.
-# (mkdocs reads docs/ from disk, so --strict needs every non-nav file excluded here.)
+# Internal design, implementation and operating records are outside the public site.
 exclude_docs: |
   adr/
   architecture/
   audit/
+  implementation/
+  loop/
   backlog.md
 
 markdown_extensions:

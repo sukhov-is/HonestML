@@ -10,6 +10,7 @@ argument — fixing it now avoids a breaking signature change later.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Literal, Protocol, runtime_checkable
 
 import numpy as np
@@ -44,3 +45,12 @@ class Metric(Protocol):
         y_pred: np.ndarray,
         sample_weight: np.ndarray | None = None,
     ) -> float: ...
+
+
+@runtime_checkable
+class _EnsembleScoreMetric(Protocol):
+    """Optional internal preparation, bound to the metric itself, for fixed targets and weights."""
+
+    def _prepare_ensemble_score(
+        self, y_true: np.ndarray, sample_weight: np.ndarray | None
+    ) -> Callable[[np.ndarray], float] | None: ...

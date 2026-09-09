@@ -95,12 +95,23 @@ class TuneOutcome:
     """A tuning result: the best params, how many trials ran, the best inner score.
 
     ``best_params`` is normalized to python-native scalars (int/float/str/bool) at the adapter
-    boundary so report emission and any fingerprint inclusion are byte-stable.
+    boundary so report emission and any fingerprint inclusion are byte-stable. ``n_trials_run``
+    counts resolved objectives, including ``failed_trials`` with non-finite scores. ``completed``
+    requires both a resolved trial budget and at least one valid objective; an all-invalid search
+    returns empty best params. Checkpoints retain invalid trials for bounded, deterministic replay.
     """
 
     best_params: dict[str, Any]
     n_trials_run: int
     best_score: float
+    reused_trials: int = 0
+    completed: bool = True
+    failed_trials: int = 0
+
+    @property
+    def successful_trials(self) -> int:
+        """Resolved objectives with finite scores; partial objectives are excluded from all counters."""
+        return self.n_trials_run - self.failed_trials
 
 
 @runtime_checkable
@@ -129,3 +140,20 @@ class Tuner(Protocol):
         deterministic given ``random_state`` when ``timeout_s`` is ``None`` (single-thread).
         """
         ...
+
+
+@runtime_checkable
+class SupportsTuningCache(Protocol):
+    """A tuner with fingerprint-scoped checkpoints, isolated per model and selected feature order."""
+
+    def configure_cache(self, cache_dir: str, fingerprint: str) -> None: ...
+
+    def set_search_context(self, model_id: str, features: tuple[str, ...]) -> None: ...
+
+
+@runtime_checkable
+class ReportsTuningTrial(Protocol):
+    """Expose the active objective's study index for per-trial cost attribution."""
+
+    @property
+    def current_trial_number(self) -> int | None: ...

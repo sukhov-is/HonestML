@@ -5,10 +5,9 @@
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://pypi.org/project/honestml/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-**Tabular AutoML where the leaderboard doesn't lie.** Most AutoML frameworks ship the
-model with the best validation score — but that number is optimistic, because you
-selected for it. honestml is built so that the score you see is the score you can
-expect in production.
+**AutoML для табличных данных с прозрачной оценкой качества.** honestml разделяет
+DEV-оценку после выбора модели и оценку на внешнем holdout. Перенос результата
+на новые данные требует независимой проверки с заранее заданными метрикой и допуском.
 
 It covers binary / multiclass classification and regression behind a clean, extensible
 core. The honesty is in *how it selects*: out-of-fold scoring on a shared CV split; a
@@ -54,7 +53,8 @@ does not earn its CV/HPO budget over catboost/lightgbm on the honesty benchmarks
 | CV schemes | stratified / kfold / group / holdout / **timeseries** (purge+embargo, value-based time order) / **timeseries_period** (calendar or Δt period folds, wall-clock gaps, optional per-period weighting, rolling train window) — `fit(..., time=, label_time=, groups=)` |
 | Outer holdout + finalize | `cv=CVConfig(outer_holdout=0.2)`: selection sees only DEV, the holdout is scored once; the shipped model is refit on all data after scoring (`finalize=True`) |
 | Presets | `AutoML(preset="fast" / "balanced" / "best")` — declarative, data-driven partial configs; an explicit argument always wins; honesty parameters are not presettable |
-| Budget + resume | `budget=600` (seconds) or `BudgetConfig(...)` with graceful degradation; `cache="runs/"` resumes by run fingerprint |
+| Budget + resume | `budget=600` — кооперативный бюджет; `cache="runs/"` переиспользует совместимые завершённые результаты |
+| Ограниченный поиск | `search=SearchConfig(...)` — пробы семейств, ограниченный FS и широкий контроль; [стоимость и границы прогноза](docs/training-performance.md) |
 | Feature engineering / selection | OOF-honest target (binary-only) / frequency encoding, datetime deltas, intersections; importance / null-importance / random-probe / sequential / SHAP selection with an importance-ordered **refinement cascade** (default) and honest arbitration |
 | HPO + ensembling | `hpo=HPOConfig(...)` (Optuna, per-model search before the honest selection); `ensemble=EnsembleConfig()` — a Caruana/weighted blend ships **only if significantly better** |
 | Run report | `model.run_report_` (versioned JSON, tracker-independent); `save_run_report` and `render_report` produce markdown or self-contained HTML (charts via the `report` extra) |
@@ -81,10 +81,10 @@ estimator and the optional calibrator still ship as joblib).
 
 ## Reproducibility
 
-Every run computes a **fingerprint** over the resolved config, data signature,
-estimator set and library versions; the run report carries it together with the
-full provenance (leaderboard, band, budget outcome, FS/HPO/ensemble decisions,
-timings). Same inputs → same selection.
+Каждый запуск вычисляет **fingerprint** по разрешённой конфигурации, данным,
+каталогу моделей и версиям библиотек. Отчёт сохраняет этот контекст вместе с
+решениями FS/HPO/ансамбля и выполненной работой. Таймауты HPO и ресурсные
+ограничения могут изменить объём завершённой работы и итог при том же fingerprint.
 
 ## Documentation
 

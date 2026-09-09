@@ -1,8 +1,8 @@
 # Correctness guide
 
-The library's claim is an **honestly best model**: the score you see is the score
-you can expect. This page lists the enforced mechanisms behind that claim — each is
-a tested mechanism, not an aspiration — and the known limitations.
+Библиотека раскрывает способ выбора модели, вычислительный контекст и границы
+оценки качества. Ниже описаны механизмы контроля и ограничения. DEV-оценка после
+адаптивного поиска не гарантирует качество на новых данных.
 
 ## Honest selection
 
@@ -19,31 +19,29 @@ a tested mechanism, not an aspiration — and the known limitations.
   resampling understates variance under autocorrelation. The full band is reported
   (`band_member_ids`, tie-break disclosed), not silently dropped; pure argmax is an
   explicit opt-out.
-- **Absolute, reproducible scores.** Metrics are absolute — no candidate-relative
-  normalization. The pipeline is seeded end to end, so the same inputs give the
-  same selection (the one opt-out is a wall-clock-capped HPO search,
-  `HPOConfig.timeout_s`, disclosed in the run report); the run-fingerprint — a hash
-  over seeds, resolved config, data signature and library versions — identifies the
-  run for caching and resume.
+- **Воспроизводимый контекст.** Метрики не нормируются относительно кандидатов.
+  Seed, разрешённая конфигурация, данные и версии библиотек входят в fingerprint
+  для кеша и возобновления. Таймаут HPO и ресурсные ограничения поиска могут
+  изменить выполненную работу и итог; соответствующие решения раскрыты в отчёте.
 
 ## Leakage controls
 
-- **Feature engineering and selection are OOF-honest.** Target encodings are
-  cross-fitted out-of-fold for evaluation, so a row never sees its own fold's
-  target; frequency encoding is target-independent, so its full-train fit cannot
-  leak the label. Feature selection arbitrates on an internal selection holdout or
-  nested DEV folds — never on the selection OOF itself.
+- **Подготовка признаков и адаптивный отбор.** Target encoding использует
+  cross-fit; FS сравнивает признаки внутри DEV. После адаптивного выбора subset,
+  параметров или семейства DEV-оценку следует читать как `post_search_dev`.
+  Широкий контроль проверяет альтернативу полного набора на DEV; он не заменяет
+  независимую внешнюю приёмку.
 - **Time series.** `cv=CVConfig(scheme="timeseries")` orders folds by time value,
   not row position, and applies `purge`/`embargo` gaps; optional label-end times
   (`label_time`) implement the de Prado purge for labels that span a horizon.
   Group CV keeps each group on one side of every split.
-- **Outer holdout.** `CVConfig(outer_holdout=...)` carves an untouched share once.
-  Selection, refit and calibration see only DEV — the development split, everything
-  outside the holdout; the winner is scored on the holdout a single time, and the
-  report keeps that DEV-vs-holdout separation. With `finalize=True` the *shipped*
-  model is refit on all data AFTER scoring — the reported score remains the holdout
-  score of the DEV-trained model, a conservative bound for the finalized all-data
-  model; it is never re-measured after the refit.
+- **Внешний holdout и finalize.** `CVConfig(outer_holdout=...)` отделяет данные
+  оценки от DEV, используемого для поиска и калибровки. Оценка относится к
+  DEV-модели, включая ансамбль, если он применён. При `finalize=True` модель
+  затем обучается на всех данных; сохранённый score не является гарантированной
+  границей её качества. Просмотренный holdout не служит независимым тестом
+  последующих изменений: для приёмки заранее фиксируют внешний набор/период,
+  метрику, допуск и сравниваемые предсказания.
 
 ## Small datasets
 
@@ -99,20 +97,17 @@ never diverge from the local report.
   target statistics never leak across folds (the early-stopping validation split is
   unweighted). The `linear`/`baseline` models still consume the integer codes,
   whose arbitrary numeric order can limit them on high-cardinality categoricals.
-- **Early stopping is not used inside HPO**: boosting models early-stop on the
-  selection folds (the `n_es` tail carved from each fold's training rows is held out as
-  the validation set on every CV scheme, ADR-0080), but **not** inside inner-CV
-  hyperparameter search — there a tuned `n_estimators` is a ceiling that early stopping
-  later trims on the selection folds.
-- **Feature-selection size carries a mild in-sample optimism**: with the default
-  refinement cascade (`refine=True`) the subset size is chosen by a **power-adaptive
-  non-inferiority** rule (a more compact size ships only when it is not significantly worse
-  than the best, within `refine_tol`) plus an importance **mass floor** (`refine_min_mass`);
-  the band's anchor is the argmax on the **same** out-of-fold folds it then tests on (the
-  Same-OOF residual, ADR-0085 §5), so the chosen size is slightly optimistic. The bias
-  direction is conservative — at low test power the rule *stops* pruning rather than
-  over-pruning — and `no_selection_gate` still catches a subset that regresses versus no
-  selection; a fully independent OOF is a Day-2 improvement.
+- **Early stopping внутри HPO.** При доступном ES-разбиении внутренний CV
+  выделяет validation внутри train; inner-test не используется для остановки.
+  IID-разбиения используют долю train, временные — настроенный ES-хвост.
+  Явные `iterations`/`n_estimators` задают потолок ES-fit; итоговый refit
+  использует медиану фактических DEV rounds.
+- **Адаптивный размер subset.** Refinement выбирает размер по non-inferiority
+  относительно лучшей точки той же OOF-траектории с допуском `refine_tol` и
+  importance mass floor. Повторное использование этих оценок сохраняет риск
+  оптимизма. Широкий контроль ограничивает риск регрессии на DEV, но не
+  гарантирует отсутствие ухудшения на внешних данных. При возврате к полному
+  набору `feature_selection=None` не означает отсутствия выполненной FS-работы.
 - **Preprocessing and probability calibration are not part of the ONNX graph.**
   The graph consumes the numeric design matrix: rebuild it from the bundled
   `schema.json` (the categorical ordinal mapping is in

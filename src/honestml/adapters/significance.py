@@ -8,8 +8,8 @@ includes 0** — conservative to the post-hoc argmax anchor (SPIKE-0002: roc_auc
 1.000). For time-series OOF a **fold-level block bootstrap** resamples whole CV test folds
 (``block_index``), since i.i.d. row resampling understates variance under autocorrelation.
 
-numpy-only: the injected ``Metric`` carries the sklearn dependency, so the band machinery
-keeps ``core`` free of heavy ML libraries (NFR-M4-4/6).
+Built-in additive metrics prepare row contributions once; ranking and custom metrics retain the
+injected scorer. The band machinery keeps core free of heavy ML libraries (NFR-M4-4/6).
 """
 
 from __future__ import annotations
@@ -20,6 +20,8 @@ from typing import Literal
 import numpy as np
 
 from honestml.core import ConfigError, Metric, get_logger
+
+from .metrics import _prepare_bootstrap_score
 
 logger = get_logger("adapters.significance")
 
@@ -142,12 +144,18 @@ class BootstrapSignificanceTest:
         # candidate pool (each pairwise test draws the same resamples; NFR-M4-2, ADR-0026 §2)
         rng = np.random.default_rng(self.seed)
         n = y_true.shape[0]
+        score_a = _prepare_bootstrap_score(self.metric, y_true, pred_a, sample_weight)
+        score_b = _prepare_bootstrap_score(self.metric, y_true, pred_b, sample_weight)
+
+        def delta(indices: np.ndarray) -> float:
+            if score_a is not None and score_b is not None:
+                return score_b(indices) - score_a(indices)
+            return self._delta(indices, pred_a, pred_b, y_true, sample_weight)
+
         deltas = np.empty(self.n_boot, dtype=np.float64)
         if block_index is None:
             for i in range(self.n_boot):
-                deltas[i] = self._delta(
-                    rng.integers(0, n, size=n), pred_a, pred_b, y_true, sample_weight
-                )
+                deltas[i] = delta(rng.integers(0, n, size=n))
         else:
             # exclude uncovered rows (id -1); mirrors _period_block_deltas so a stray -1 never forms a block
             blocks = [np.flatnonzero(block_index == b) for b in np.unique(block_index) if b >= 0]
@@ -161,7 +169,7 @@ class BootstrapSignificanceTest:
                 key = chosen.tobytes()
                 if key not in seen:
                     idx = np.concatenate([blocks[j] for j in chosen])
-                    seen[key] = self._delta(idx, pred_a, pred_b, y_true, sample_weight)
+                    seen[key] = delta(idx)
                 deltas[i] = seen[key]
         return deltas
 

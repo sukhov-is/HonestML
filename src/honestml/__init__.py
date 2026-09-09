@@ -33,6 +33,7 @@ from .core import (
     RunConfig,
     RunContext,
     SchemaValidationError,
+    SearchConfig,
     SelectionPolicy,
     Task,
     TrackerConfig,
@@ -65,6 +66,7 @@ __all__ = [
     "BudgetExhaustedError",
     "FeatureSelectionError",
     # config / context / logging
+    "SearchConfig",
     "RunConfig",
     "CVConfig",
     "BudgetConfig",

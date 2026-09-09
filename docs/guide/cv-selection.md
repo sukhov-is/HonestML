@@ -233,13 +233,13 @@ print(model.band_member_ids_, model.band_width_, model.winner_by_tiebreak_)
 
 ## Outer holdout and finalize
 
-`outer_holdout` carves a fraction of the data once, before anything else runs.
-Selection, tuning and calibration see only the remaining DEV part; the winner is
-scored on the holdout exactly once and the score lands in `holdout_score_`. With
-`finalize=True` (the default) the *shipped* model is then refit on all data —
-after scoring, so the reported number stays a conservative estimate for the
-model you deploy. The carve is scheme-aware (stratified for classification,
-tail-of-time for time series).
+`outer_holdout` отделяет оценочные строки от DEV, используемого для поиска
+и калибровки. `holdout_score_` относится к DEV-модели, включая применённый
+ансамбль. При `finalize=True` модель затем обучается на всех данных;
+сохранённая оценка не является гарантированной границей качества этой модели.
+Разбиение учитывает схему CV: стратификацию для классификации и позднее окно
+для временных данных. Просмотренный holdout не заменяет независимый внешний
+набор для приёмки последующих изменений.
 
 ```python
 from sklearn.datasets import make_classification

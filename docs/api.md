@@ -46,7 +46,7 @@ manifest (`run_report_["config"]`). You configure `AutoML` through its construct
 arguments, which accept the section classes below directly: `cv=CVConfig(...)`,
 `budget=BudgetConfig(...)`, `feature_engineering=FEConfig(...)`,
 `feature_selection=FeatureSelectionConfig(...)`, `hpo=HPOConfig(...)`,
-`ensemble=EnsembleConfig(...)`. `TrackerConfig` stands apart: it configures the
+`ensemble=EnsembleConfig(...)`, `search=SearchConfig(...)`. `TrackerConfig` stands apart: it configures the
 experiment tracker passed through the `tracker` argument of `AutoML`.
 
 ::: honestml.RunConfig
@@ -54,6 +54,10 @@ experiment tracker passed through the `tracker` argument of `AutoML`.
 ::: honestml.CVConfig
 
 ::: honestml.BudgetConfig
+
+::: honestml.SearchConfig
+
+Раздельные ресурсы начальных проб, подтверждения и FS, а также повторное обучение с фиксированными `models` и одной FS-стратегией описаны в [руководстве по стоимости обучения](training-performance.md#fast-search). Аргумент `AutoML` называется `models`; в разрешённом `RunConfig` семейства записаны в `model_types`.
 
 ::: honestml.FEConfig
 

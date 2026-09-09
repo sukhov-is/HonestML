@@ -169,7 +169,9 @@ def run_sweep(cardinalities: Sequence[int] = CARDINALITIES) -> dict:
         "n_splits": N_SPLITS,
         "gap_margin": GAP_MARGIN,
         "records": records,
-        "curve": [{"cardinality": p.cardinality, "overfit_gap": round(p.overfit_gap, 4)} for p in curve],
+        "curve": [
+            {"cardinality": p.cardinality, "overfit_gap": round(p.overfit_gap, 4)} for p in curve
+        ],
         "recommended_cap": cap,
     }
 
@@ -180,7 +182,9 @@ def main(argv: list[str]) -> int:
     result = run_sweep()
     RESULTS.write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
     print(f"\nresults written to {RESULTS}")
-    print(f"recommended native_cat_max_unique cap (knee of the overfit-gap curve): {result['recommended_cap']}")
+    print(
+        f"recommended native_cat_max_unique cap (knee of the overfit-gap curve): {result['recommended_cap']}"
+    )
     return 0
 
 

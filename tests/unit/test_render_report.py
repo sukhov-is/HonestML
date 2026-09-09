@@ -145,3 +145,37 @@ def test_facade_report_renders_with_task_metric_and_preset(tmp_path) -> None:
     assert "| task | binary |" in text
     assert f"| metric | {model.run_report_['metric']} |" in text
     assert "fast (applied: cv)" in text
+
+
+def test_cost_rendering_uses_exclusive_intervals(tmp_path) -> None:
+    report = dict(_MINIMAL)
+    report["cost"] = {
+        "total_wall_s": 8.0,
+        "attributed_wall_s": 6.0,
+        "overhead_s": 2.0,
+        "exclusive_timings": {"run": {"selection": 4.0, "hpo": 2.0}},
+        "fit_counts": {"attempted": 3, "completed": 2, "failed": 1},
+        "sampled_peak_rss_mb": 120.0,
+        "memory_measurement": "stage_boundaries",
+    }
+    text = render_report(report, tmp_path, fmt="md").read_text(encoding="utf-8")
+    assert "Training cost" in text
+    assert "| total_wall_s | 8 |" in text
+    assert "Exclusive timings (s)" in text
+    assert "| run.selection | 4 |" in text
+    assert "| run.selection | 1.25 |" not in text
+    assert "| fits failed | 1 |" in text
+
+
+def test_cost_environment_marks_missing_memory_probe(monkeypatch) -> None:
+    from honestml.core import RunContext
+
+    monkeypatch.setattr(rr, "find_spec", lambda name: None)
+    ctx = RunContext()
+    rr.configure_run_cost(ctx)
+    cost = ctx.cost_report()
+    assert cost["memory_measurement"] == "unavailable"
+    assert cost["sampled_peak_rss_mb"] is None
+    assert cost["environment"]["ram_mb"] is None
+    assert "python" in cost["environment"]
+    assert "versions" in cost["environment"]

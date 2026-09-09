@@ -10,13 +10,114 @@ leakage-critical loop, the scale-invariant aggregation and the cutoff+floor — 
 from __future__ import annotations
 
 import math
+from contextlib import nullcontext
+from dataclasses import dataclass, field
 
 import numpy as np
 
-from honestml.core import FeatureRanker, Fold, get_logger
+from honestml.core import FeatureRanker, Fold, RunContext, Task, get_logger
 from honestml.core.config import FeatureSelectionConfig
 
+from .oof_scorer import FitPredict
+
 logger = get_logger("application.feature_selection")
+
+
+def sample_training_rows(
+    y: np.ndarray, *, max_rows: int, task: Task, random_state: int
+) -> np.ndarray:
+    """Sample a training partition in row order, retaining proportional class representation.
+
+    Classification keeps at least one row per present class; an infeasible cap raises before
+    fitting. Sampling never adds rows, so callers' group/time separation remains intact.
+    """
+    if max_rows < 1:
+        raise ValueError("max_rows must be positive")
+    n = len(y)
+    if n <= max_rows:
+        return np.arange(n)
+    rng = np.random.default_rng(random_state)
+    if not task.is_classification:
+        return np.sort(rng.choice(n, max_rows, replace=False))
+    _, codes, counts = np.unique(y, return_inverse=True, return_counts=True)
+    if len(counts) > max_rows:
+        raise ValueError("max_rows cannot retain all training classes")
+    quotas = max_rows * counts / n
+    allocation = np.maximum(1, np.floor(quotas).astype(int))
+    while allocation.sum() > max_rows:
+        excess = np.where(allocation > 1, allocation - quotas, -np.inf)
+        allocation[int(np.argmax(excess))] -= 1
+    while allocation.sum() < max_rows:
+        deficit = np.where(allocation < counts, quotas - allocation, -np.inf)
+        allocation[int(np.argmax(deficit))] += 1
+    return np.sort(
+        np.concatenate(
+            [
+                rng.choice(np.flatnonzero(codes == label), size, replace=False)
+                for label, size in enumerate(allocation)
+            ]
+        )
+    )
+
+
+@dataclass
+class BoundedFeatureRanker:
+    """Apply a configured ranker to a deterministic subset of each supplied training partition."""
+
+    ranker: FeatureRanker
+    task: Task
+    max_rows: int
+    name: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.name = self.ranker.name
+
+    def auto_threshold(self, n_features: int) -> float:
+        return self.ranker.auto_threshold(n_features)
+
+    def rank(
+        self,
+        x: np.ndarray,
+        y: np.ndarray,
+        *,
+        categorical: np.ndarray,
+        random_state: int,
+        sample_weight: np.ndarray | None = None,
+        groups: np.ndarray | None = None,
+    ) -> np.ndarray:
+        rows = sample_training_rows(
+            y, max_rows=self.max_rows, task=self.task, random_state=random_state
+        )
+        return self.ranker.rank(
+            x[rows],
+            y[rows],
+            categorical=categorical,
+            random_state=random_state,
+            sample_weight=sample_weight[rows] if sample_weight is not None else None,
+            groups=groups[rows] if groups is not None else None,
+        )
+
+
+def bounded_fit_predict(fit_predict: FitPredict, *, task: Task, max_rows: int) -> FitPredict:
+    """Bound refinement proxy training while evaluating every supplied test row."""
+
+    def fit(
+        x: np.ndarray,
+        y: np.ndarray,
+        test: np.ndarray,
+        sample_weight: np.ndarray | None,
+        random_state: int,
+    ) -> tuple[np.ndarray | None, np.ndarray, np.ndarray | None]:
+        rows = sample_training_rows(y, max_rows=max_rows, task=task, random_state=random_state)
+        return fit_predict(
+            x[rows],
+            y[rows],
+            test,
+            sample_weight[rows] if sample_weight is not None else None,
+            random_state,
+        )
+
+    return fit
 
 
 def structure_labels(
@@ -161,6 +262,7 @@ def aggregate_scores(
     config: FeatureSelectionConfig,
     sample_weight: np.ndarray | None = None,
     groups: np.ndarray | None = None,
+    ctx: RunContext | None = None,
 ) -> np.ndarray:
     """OOF feature ranking on the evaluation folds -> one aggregate score vector (ADR-0044 §1).
 
@@ -176,22 +278,27 @@ def aggregate_scores(
     random_state = config.random_state if config.random_state is not None else 0
     scores = np.zeros(n_features, dtype=np.float64)
     k = 0
-    for fold in folds:
+    for fold_id, fold in enumerate(folds):
         train_idx = (
             fold.fit_idx if fold.es_idx.size == 0 else np.concatenate([fold.fit_idx, fold.es_idx])
         )
         sw = sample_weight[train_idx] if sample_weight is not None else None
-        imp = np.asarray(
-            ranker.rank(
-                x_full[train_idx],
-                y[train_idx],
-                categorical=categorical,
-                random_state=random_state,
-                sample_weight=sw,
-                groups=groups[train_idx] if groups is not None else None,
-            ),
-            dtype=np.float64,
-        )
+        with (
+            ctx.fit_attribution(recipe=ranker.name, fold=fold_id)
+            if ctx is not None
+            else nullcontext()
+        ):
+            imp = np.asarray(
+                ranker.rank(
+                    x_full[train_idx],
+                    y[train_idx],
+                    categorical=categorical,
+                    random_state=random_state,
+                    sample_weight=sw,
+                    groups=groups[train_idx] if groups is not None else None,
+                ),
+                dtype=np.float64,
+            )
         if imp.shape != (n_features,) or not bool(np.all(np.isfinite(imp))):
             raise ValueError(
                 f"ranker {ranker.name!r} returned an invalid score vector: shape {imp.shape} "
@@ -212,6 +319,7 @@ def select_features(
     config: FeatureSelectionConfig,
     sample_weight: np.ndarray | None = None,
     groups: np.ndarray | None = None,
+    ctx: RunContext | None = None,
 ) -> tuple[int, ...]:
     """Single-cut selection: :func:`aggregate_scores` + :func:`apply_cutoff` (ADR-0044 §1).
 
@@ -227,6 +335,7 @@ def select_features(
         config=config,
         sample_weight=sample_weight,
         groups=groups,
+        ctx=ctx,
     )
     return apply_cutoff(agg, config, ranker.auto_threshold(x_full.shape[1]))
 

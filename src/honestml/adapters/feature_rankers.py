@@ -17,12 +17,13 @@ so every fit here median-imputes NaN per call from TRAIN statistics (:func:`_imp
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextlib import AbstractContextManager, nullcontext
 
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.ensemble import ExtraTreesClassifier, ExtraTreesRegressor
 
-from honestml.core import MissingDependencyError, Task
+from honestml.core import MissingDependencyError, RunContext, Task
 
 # cheap fixed budget for a ranker-model (NFR-FS-5): far lighter than the candidate boosting budget
 _N_TREES = 100
@@ -72,16 +73,35 @@ def _impute_pair(x_tr: np.ndarray, x_te: np.ndarray) -> tuple[np.ndarray, np.nda
 
 
 def _fit_ranker_model(
-    task: Task, x: np.ndarray, y: np.ndarray, random_state: int, sample_weight: np.ndarray | None
-):
+    task: Task,
+    x: np.ndarray,
+    y: np.ndarray,
+    random_state: int,
+    sample_weight: np.ndarray | None,
+    *,
+    threads: int | None = None,
+    ctx: RunContext | None = None,
+    n_estimators: int | None = None,
+    trial: int | None = None,
+) -> ExtraTreesClassifier | ExtraTreesRegressor:
     """Fit the cheap estimator-agnostic ranker-model (ExtraTrees) on ``x`` (ADR-0043 §4)."""
     x = _impute_train(x)
+    workers = _N_JOBS if threads is None else threads
+    tree_count = _N_TREES if n_estimators is None else n_estimators
     model = (
-        ExtraTreesClassifier(n_estimators=_N_TREES, random_state=random_state, n_jobs=_N_JOBS)
+        ExtraTreesClassifier(n_estimators=tree_count, random_state=random_state, n_jobs=workers)
         if task.is_classification
-        else ExtraTreesRegressor(n_estimators=_N_TREES, random_state=random_state, n_jobs=_N_JOBS)
+        else ExtraTreesRegressor(n_estimators=tree_count, random_state=random_state, n_jobs=workers)
     )
-    model.fit(x, y, sample_weight=sample_weight)
+    scope: AbstractContextManager[dict[str, int | None]] = (
+        ctx.timed_fit("fs", model_id="proxy", rows=x.shape[0], columns=x.shape[1], trial=trial)
+        if ctx is not None
+        else nullcontext(dict[str, int | None]())
+    )
+    with scope as resources:
+        resources["tree_budget"] = tree_count
+        model.fit(x, y, sample_weight=sample_weight)
+        resources["iterations"] = len(model.estimators_)
     return model
 
 
@@ -114,19 +134,51 @@ def _fit_importances(
     y: np.ndarray,
     random_state: int,
     sample_weight: np.ndarray | None,
+    *,
+    threads: int | None = None,
+    ctx: RunContext | None = None,
+    n_estimators: int | None = None,
+    trial: int | None = None,
 ) -> np.ndarray:
     """Impurity importances of a cheap ExtraTrees fit on ``x`` (codes fed as numeric, like the models)."""
-    model = _fit_ranker_model(task, x, y, random_state, sample_weight)
+    model = _fit_ranker_model(
+        task,
+        x,
+        y,
+        random_state,
+        sample_weight,
+        threads=threads,
+        ctx=ctx,
+        n_estimators=n_estimators,
+        trial=trial,
+    )
     return np.asarray(model.feature_importances_, dtype=np.float64)
 
 
-class ImportanceRanker:
+class _RankerResources:
+    def __init__(self, task: Task) -> None:
+        self._task = task
+        self._threads: int | None = None
+        self._ctx: RunContext | None = None
+        self._iterations: int | None = None
+
+    def set_threads(self, threads: int) -> None:
+        self._threads = threads
+
+    def set_ranker_iterations(self, iterations: int) -> None:
+        self._iterations = iterations
+
+    def set_run_context(self, ctx: RunContext) -> None:
+        self._ctx = ctx
+
+
+class ImportanceRanker(_RankerResources):
     """Rank features by a tree-ensemble's impurity importance (ADR-0044 §2); non-negative scores."""
 
     name = "importance"
 
     def __init__(self, task: Task) -> None:
-        self._task = task
+        super().__init__(task)
 
     def rank(
         self,
@@ -139,14 +191,23 @@ class ImportanceRanker:
         groups: np.ndarray | None = None,
     ) -> np.ndarray:
         _check_non_empty(x)
-        return _fit_importances(self._task, x, y, random_state, sample_weight)
+        return _fit_importances(
+            self._task,
+            x,
+            y,
+            random_state,
+            sample_weight,
+            threads=self._threads,
+            ctx=self._ctx,
+            n_estimators=self._iterations,
+        )
 
     def auto_threshold(self, n_features: int) -> float:
         # above the uniform share -> "more important than an average feature" (ADR-0044 §3)
         return 1.0 / n_features
 
 
-class NullImportanceRanker:
+class NullImportanceRanker(_RankerResources):
     """Score features by their importance margin over a permuted-target null (ADR-0047 §1).
 
     Refit the cheap ranker-model on ``n_runs`` target permutations to build a per-feature null
@@ -161,7 +222,7 @@ class NullImportanceRanker:
     name = "null_importance"
 
     def __init__(self, task: Task, n_runs: int = 30, null_percentile: float = 95.0) -> None:
-        self._task = task
+        super().__init__(task)
         self._n_runs = n_runs
         self._null_percentile = null_percentile
 
@@ -176,7 +237,17 @@ class NullImportanceRanker:
         groups: np.ndarray | None = None,
     ) -> np.ndarray:
         _check_non_empty(x)
-        imp_real = _fit_importances(self._task, x, y, random_state, sample_weight)
+        imp_real = _fit_importances(
+            self._task,
+            x,
+            y,
+            random_state,
+            sample_weight,
+            threads=self._threads,
+            ctx=self._ctx,
+            n_estimators=self._iterations,
+            trial=0,
+        )
         rng = np.random.RandomState(random_state)
         # block structure is constant across permutations -> precompute the per-block row indices once
         # (`groups` (M6d) restricts the shuffle to within structure blocks, ADR-0050; None = i.i.d.)
@@ -188,7 +259,17 @@ class NullImportanceRanker:
             # permute the training target -> the null hypothesis; the model seed stays fixed so the
             # null reflects target shuffling, not model randomness (deterministic via rng order).
             y_perm = _permute_target(y, block_indices, rng)
-            null[r] = _fit_importances(self._task, x, y_perm, random_state, sample_weight)
+            null[r] = _fit_importances(
+                self._task,
+                x,
+                y_perm,
+                random_state,
+                sample_weight,
+                threads=self._threads,
+                ctx=self._ctx,
+                n_estimators=self._iterations,
+                trial=r + 1,
+            )
         return imp_real - np.percentile(null, self._null_percentile, axis=0)
 
     def auto_threshold(self, n_features: int) -> float:
@@ -197,6 +278,9 @@ class NullImportanceRanker:
 
 def make_ranker_fit_predict(
     task: Task,
+    threads: int | None = None,
+    ctx: RunContext | None = None,
+    n_estimators: int | None = None,
 ) -> Callable[
     [np.ndarray, np.ndarray, np.ndarray, np.ndarray | None, int],
     tuple[np.ndarray | None, np.ndarray, np.ndarray | None],
@@ -209,7 +293,19 @@ def make_ranker_fit_predict(
     the application (this only fits one matrix).
     """
 
-    def fit_predict(
+    predictor = _RankerFitPredict(task)
+    if threads is not None:
+        predictor.set_threads(threads)
+    if ctx is not None:
+        predictor.set_run_context(ctx)
+    if n_estimators is not None:
+        predictor.set_ranker_iterations(n_estimators)
+    return predictor
+
+
+class _RankerFitPredict(_RankerResources):
+    def __call__(
+        self,
         x_tr: np.ndarray,
         y_tr: np.ndarray,
         x_te: np.ndarray,
@@ -217,24 +313,24 @@ def make_ranker_fit_predict(
         random_state: int,
     ) -> tuple[np.ndarray | None, np.ndarray, np.ndarray | None]:
         x_tr, x_te = _impute_pair(x_tr, x_te)
-        if task.is_classification:
-            clf = ExtraTreesClassifier(
-                n_estimators=_N_TREES, random_state=random_state, n_jobs=_N_JOBS
-            )
-            clf.fit(x_tr, y_tr, sample_weight=sample_weight)
-            # predict sums per-tree outputs in completion order under n_jobs>1 (ULP drift);
-            # fit parallelism is seed-deterministic, prediction must stay sequential.
-            clf.set_params(n_jobs=1)
-            return clf.predict_proba(x_te), clf.predict(x_te), clf.classes_
-        reg = ExtraTreesRegressor(n_estimators=_N_TREES, random_state=random_state, n_jobs=_N_JOBS)
-        reg.fit(x_tr, y_tr, sample_weight=sample_weight)
-        reg.set_params(n_jobs=1)
-        return None, reg.predict(x_te), None
+        model = _fit_ranker_model(
+            self._task,
+            x_tr,
+            y_tr,
+            random_state,
+            sample_weight,
+            threads=self._threads,
+            ctx=self._ctx,
+            n_estimators=self._iterations,
+        )
+        # ordered accumulation keeps predictions identical across worker counts
+        model.set_params(n_jobs=1)
+        if self._task.is_classification:
+            return model.predict_proba(x_te), model.predict(x_te), model.classes_
+        return None, model.predict(x_te), None
 
-    return fit_predict
 
-
-class RandomProbeRanker:
+class RandomProbeRanker(_RankerResources):
     """Score features by their importance margin over ``n_probes`` seeded random columns (ADR-0044 §2).
 
     The margin is signed (a feature below every probe is negative); the spine's ``auto`` cutoff keeps
@@ -245,7 +341,7 @@ class RandomProbeRanker:
     name = "random_probe"
 
     def __init__(self, task: Task, n_probes: int = 3) -> None:
-        self._task = task
+        super().__init__(task)
         self._n_probes = n_probes
 
     def rank(
@@ -261,7 +357,16 @@ class RandomProbeRanker:
         _check_non_empty(x)
         rng = np.random.RandomState(random_state)
         probes = rng.random((x.shape[0], self._n_probes))
-        imp = _fit_importances(self._task, np.hstack([x, probes]), y, random_state, sample_weight)
+        imp = _fit_importances(
+            self._task,
+            np.hstack([x, probes]),
+            y,
+            random_state,
+            sample_weight,
+            threads=self._threads,
+            ctx=self._ctx,
+            n_estimators=self._iterations,
+        )
         n = x.shape[1]
         probe_max = float(imp[n:].max())
         return imp[:n] - probe_max
@@ -309,7 +414,7 @@ def _mean_abs_per_feature(shap_values: object, n_features: int) -> np.ndarray:
     return np.asarray(arr, dtype=np.float64).mean(axis=0).reshape(n_features)
 
 
-class ShapRanker:
+class ShapRanker(_RankerResources):
     """Rank features by mean absolute SHAP value of a cheap tree ensemble (ADR-0051; lazy ``shap`` extra).
 
     Fits the same estimator-agnostic ExtraTrees ranker-model as ``importance`` and scores features by
@@ -334,7 +439,7 @@ class ShapRanker:
             import shap  # noqa: F401
         except ImportError as exc:
             raise MissingDependencyError("shap") from exc
-        self._task = task
+        super().__init__(task)
         self._max_samples = max_samples
         self._perturbation = perturbation
         self._background_samples = background_samples
@@ -356,7 +461,16 @@ class ShapRanker:
         # re-bind so the model, x_explain, the background and KMeans all see the SAME imputed matrix
         # (attributions on a different matrix than the fit would be dishonest); the fit guard no-ops.
         x = _impute_train(x)
-        model = _fit_ranker_model(self._task, x, y, random_state, sample_weight)
+        model = _fit_ranker_model(
+            self._task,
+            x,
+            y,
+            random_state,
+            sample_weight,
+            threads=self._threads,
+            ctx=self._ctx,
+            n_estimators=self._iterations,
+        )
         x_explain = x if self._max_samples is None else x[: self._max_samples]
         if self._perturbation == "interventional":
             # interventional Tree SHAP integrates over a background distribution (causally cleaner

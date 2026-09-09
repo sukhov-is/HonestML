@@ -10,6 +10,7 @@ from .config import (
     FEConfig,
     HPOConfig,
     RunConfig,
+    SearchConfig,
     TrackerConfig,
 )
 from .context import RunContext
@@ -88,6 +89,7 @@ from .task import Task, resolve_positive
 
 __all__ = [
     # config / context / logging (M0)
+    "SearchConfig",
     "RunConfig",
     "CVConfig",
     "BudgetConfig",

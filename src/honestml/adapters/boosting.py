@@ -8,8 +8,9 @@ library spans all task kinds; ``build`` picks the classifier (binary/multiclass)
 (regression) branch by ``task.kind``.
 
 **Early stopping** (ADR-0080): when ``run_slice`` passes a carved ``X_val``/``y_val`` tail, the
-fit raises the tree count to a generous ceiling and stops on the validation metric (each library's
-native API); without a tail it falls back to the conservative fixed ``n_estimators`` and logs the
+fit treats an explicit tree count as the upper bound and otherwise uses a generous ceiling, stopping
+on the native validation metric. Refit consumes the iteration count derived from DEV folds; without
+a tail or DEV count it falls back to the conservative fixed ``n_estimators`` and logs the
 "no early stopping" advisory (ADR-0020 §2). When ``categorical_indices`` is injected (native-capable
 wrapper, ADR-0088/0089), CatBoost/LightGBM consume those columns natively (CatBoost int-cast Pool,
 LightGBM ``categorical_feature``); otherwise codes are fed as numeric. ``random_state`` maps to each
@@ -164,6 +165,7 @@ class _BoostingBase:
         self._params = dict(params or {})
         self.feature_names: list[str] = []
         self._model: Any | None = None
+        self._iteration_budget: int | None = None
         # original labels for int-coded backends (ADR-0081), set by the classifier branch; None = the
         # native estimator consumes the labels as-is (catboost/lightgbm, and every regressor).
         self._label_index: np.ndarray | None = None
@@ -188,23 +190,16 @@ class _BoostingBase:
     def _make(
         self, extra: Mapping[str, Any] | None = None, *, n_estimators: int | None = None
     ) -> Any:
-        # tuned `params` override the fixed defaults (ADR-0061 §4). The tree count is special: on the ES
-        # path the caller passes the generous ceiling, which must win over a tuned count (ADR-0080), so it
-        # is applied LAST; on the no-ES path a tuned count overrides the default (`setdefault`).
         kwargs: dict[str, Any] = {
             self._backend.seed_kwarg: self._random_state,
             **self._backend.extra_kwargs,
             **(extra or {}),
             **self._params,
         }
-        if n_estimators is not None:
-            kwargs[self._backend.n_estimators_kwarg] = (
-                n_estimators  # ES ceiling wins over a tuned count
-            )
-        else:
-            kwargs.setdefault(
-                self._backend.n_estimators_kwarg, _N_ESTIMATORS
-            )  # tuned count overrides default
+        kwargs.setdefault(
+            self._backend.n_estimators_kwarg,
+            _N_ESTIMATORS if n_estimators is None else n_estimators,
+        )
         # CatBoost's multiclass default bootstrap (Bayesian) rejects `subsample`; binary/regression
         # default to MVS, which accepts it. Pair a tuned `subsample` with Bernoulli so the shared HPO
         # knob works for multiclass too, leaving the binary/regression default untouched.
@@ -302,8 +297,57 @@ class _BoostingBase:
             model = self._make()
             self._plain_fit(model, X, y, sample_weight)
         self._model = model
+        self._iteration_budget = self.iteration_limit(
+            early_stopping=X_val is not None and y_val is not None
+        )
         self._post_fit(model)
         return self
+
+    def iteration_limit(self, *, early_stopping: bool) -> int:
+        """Configured ceiling for a future fit, including explicit parameter overrides."""
+        return int(
+            self._params.get(
+                self._backend.n_estimators_kwarg,
+                _N_ESTIMATORS_ES if early_stopping else _N_ESTIMATORS,
+            )
+        )
+
+    @property
+    def iteration_budget(self) -> int | None:
+        """Configured upper bound of the completed native fit, absent before fitting."""
+        return self._iteration_budget
+
+    @property
+    def fitted_iterations(self) -> int | None:
+        """Number of boosting rounds used by prediction, normalized across native backends.
+
+        CatBoost and XGBoost report a zero-based best index; LightGBM reports a count.
+        Without validation the native fitted round count is used. An unfitted model has no count.
+        """
+        model = self._model
+        if model is None:
+            return None
+        if self._backend.module == "catboost":
+            best = model.get_best_iteration()
+            return int(best) + 1 if best is not None and best >= 0 else int(model.tree_count_)
+        if self._backend.module == "lightgbm":
+            best = model.best_iteration_
+            return int(best) if best > 0 else int(model.n_estimators_)
+        if self._backend.module == "xgboost":
+            best = getattr(model, "best_iteration", None)
+            return (
+                int(best) + 1 if best is not None else int(model.get_booster().num_boosted_rounds())
+            )
+        return None
+
+    def set_refit_iterations(self, count: int) -> None:
+        """Apply the DEV-derived number of boosting rounds to the next full-data fit."""
+        self._params[self._backend.n_estimators_kwarg] = count
+
+    def set_threads(self, threads: int) -> None:
+        """Apply the run's worker limit to the next native fit."""
+        key = "thread_count" if self._backend.module == "catboost" else "n_jobs"
+        self._params[key] = threads
 
     def _plain_fit(
         self, model: Any, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray | None
@@ -328,7 +372,7 @@ class _BoostingBase:
     ) -> Any:
         """Fit with early stopping on the carved es tail (ADR-0080), wiring each library's native API.
 
-        The tree count is the generous ``_N_ESTIMATORS_ES`` ceiling; ES cuts it per fold. The es tail
+        An explicit tree count caps the fit; otherwise ``_N_ESTIMATORS_ES`` is the ceiling. The es tail
         is validation only (it never enters the training rows), so OOF honesty is untouched. Validation
         sample weights are not threaded (the port carries no ``val_sample_weight`` slot) — ES is a
         stopping heuristic, not the scored metric, and ``sample_weight`` is ``None`` on the default path.
@@ -418,10 +462,11 @@ class _BoostingClassifier(_BoostingBase):
         self._multiclass = np.unique(y).size > 2
         if not self._backend.requires_int_labels:
             return y
-        self._label_index = np.unique(
-            y
-        )  # sorted originals == the sklearn class order the codes index
-        return np.searchsorted(self._label_index, y)
+        label_index: np.ndarray = np.unique(y)
+        self._label_index = (
+            label_index  # sorted originals == the sklearn class order the codes index
+        )
+        return np.searchsorted(label_index, y)
 
     def _encode_targets_apply(self, y: np.ndarray) -> np.ndarray:
         if self._label_index is None:

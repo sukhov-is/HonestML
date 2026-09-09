@@ -33,10 +33,10 @@
   "checksums": {
     "algo": "sha256",
     "files": {
-      "schema.json": "90f2dab528f9d395157631dc7f48086522ab0d2a0460b0b9d58ccb989c8ecf7d",
-      "leaderboard.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "schema.json": "595a50958202c52f6c782c5c29608ee30f9e8bc7bef907b6f567058a2bc3d2f2",
+      "leaderboard.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
       "model.txt": "821881b808697f1f8ec854c03deb48cc7ba5dee3204f19aaeb1c9466d5c16012"
     },
-    "manifest": "32aa25ccf1aa7fe8b63fba2509e3ea95cc314b510aae889bc272d51b15663f88"
+    "manifest": "48b41af93461446d6b2319fe9c74ed93f8443283ccce98eb28dc4265451e8624"
   }
 }

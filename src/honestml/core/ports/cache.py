@@ -31,3 +31,16 @@ class CandidateCache(Protocol):
     def put(self, candidate_id: str, candidate: Candidate) -> None:
         """Persist a completed candidate durably and atomically (commit-marker written last)."""
         ...
+
+
+@runtime_checkable
+class StageCache(Protocol):
+    """Atomic completed-stage storage within the adapter's versioned run-fingerprint scope."""
+
+    def get_stage(self, stage: str) -> object | None:
+        """Return a completed compatible payload, or None on uncertain/corrupt/incomplete data."""
+        ...
+
+    def put_stage(self, stage: str, value: object) -> None:
+        """Persist a completed stage atomically within the trusted local cache."""
+        ...

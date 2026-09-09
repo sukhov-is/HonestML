@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+from typing import Any
 
 import numpy as np
 import pytest
@@ -455,3 +456,46 @@ def test_fit_predict_predicts_sequentially(monkeypatch) -> None:
     x, y = _signal_noise(80)
     make_ranker_fit_predict(_BIN)(x[:60], y[:60], x[60:], None, 0)
     assert seen == [1]
+
+
+@pytest.mark.parametrize("kind", ["binary", "regression"])
+def test_proxy_worker_limit_and_fit_cost_cover_rankers_and_prediction(
+    kind: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sklearn.ensemble import ExtraTreesClassifier, ExtraTreesRegressor
+
+    from honestml.core import RunContext
+
+    task = Task(kind=kind)
+    ctx = RunContext()
+    native = ExtraTreesClassifier if task.is_classification else ExtraTreesRegressor
+    original = native.fit
+    workers: list[int] = []
+
+    def fit(self: Any, X: np.ndarray, y: np.ndarray, **kwargs: Any) -> Any:
+        workers.append(self.n_jobs)
+        return original(self, X, y, **kwargs)
+
+    monkeypatch.setattr(native, "fit", fit)
+    x, y = _signal_noise(40)
+    rankers = [
+        ImportanceRanker(task),
+        NullImportanceRanker(task, n_runs=2),
+        RandomProbeRanker(task),
+    ]
+    for ranker in rankers:
+        ranker.set_threads(2)
+        ranker.set_ranker_iterations(3)
+        ranker.set_run_context(ctx)
+        ranker.rank(x, y, categorical=_NOCAT, random_state=0)
+    make_ranker_fit_predict(task, threads=2, ctx=ctx, n_estimators=3)(
+        x[:30], y[:30], x[30:], None, 0
+    )
+    assert workers == [2] * 6
+    report = ctx.cost_report()
+    fits = report["work"]
+    assert len(fits) == 6
+    assert all(
+        row["stage"] == "fs" and row["iterations"] == row["tree_budget"] == 3 for row in fits
+    )
+    assert [row["columns"] for row in fits] == [2, 2, 2, 2, 5, 2]

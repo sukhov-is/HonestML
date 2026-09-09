@@ -184,15 +184,15 @@ def build_default_components(
     # honest selection is the default (ADR-0026 §4): the band is built on the selection metric,
     # seeded from random_state for reproducibility. The public "off" toggle (ADR-0034) returns the
     # inert NoSignificanceTest -> a pure argmax with no band membership and no forced OOF capture.
-    significance_test: SignificanceTest = (
-        NoSignificanceTest()
-        if significance == "off"
+    significance_test: SignificanceTest
+    if significance == "off":
+        significance_test = NoSignificanceTest()
+    else:
         # aggregate mirrors weighting: 'period' macro-averages per-block Δ (ADR-0098 §3); only time-ordered
         # schemes reach 'period' (gated above), so a block_index is always present when it is set.
-        else BootstrapSignificanceTest(
+        significance_test = BootstrapSignificanceTest(
             resolved, seed=random_state, n_boot=_DEFAULT_N_BOOT, aggregate=cv_config.weighting
         )
-    )
     # calibration is classification-only (ADR-0030); refinement uses a low-DOF sigmoid by default
     # (ADR-0031 §5), n_calib=None keeps 'auto' deterministic at sigmoid for the selection path.
     if task.kind == "regression" and cv_config.calibrate != "off":
@@ -336,6 +336,7 @@ def build_default_components(
             has_datetime,
             has_group,
             has_time,
+            es_fraction=_ES_FRACTION if es_enabled else 0.0,
         )[0]
         make_factory = _make_tuned_factory_builder(model_registry(), task, random_state)
         tunable = _resolve_tunable(estimators, hpo)
@@ -755,7 +756,7 @@ def _resolve_splitter(
 
     Returns the splitter and the *resolved* config (``auto`` replaced by the concrete
     scheme) so the run manifest records what actually ran (ADR-0016 §2). ``es_fraction`` (>0 only
-    for the main run splitter when a boosting is in the zoo, ADR-0080) carves an early-stopping
+    for selection and HPO splitters when a boosting is in the zoo, ADR-0080) carves an early-stopping
     tail from each fold's train — i.i.d. by a stratified subsample, group by holding out whole groups.
     """
     scheme = task.default_cv_scheme if cfg.scheme == "auto" else cfg.scheme
@@ -804,18 +805,17 @@ def _resolve_splitter(
     elif scheme == "group":
         if not has_group:
             raise ConfigError("cv scheme 'group' requires a group column (none in the schema)")
-        splitter = (
-            StratifiedGroupKFoldSplitter(
+        if task.is_classification:
+            splitter = StratifiedGroupKFoldSplitter(
                 n_splits=cfg.n_splits,
                 shuffle=True,
                 random_state=random_state,
                 es_fraction=es_fraction,
             )
-            if task.is_classification
-            else GroupKFoldSplitter(
+        else:
+            splitter = GroupKFoldSplitter(
                 n_splits=cfg.n_splits, random_state=random_state, es_fraction=es_fraction
             )
-        )
     elif scheme == "holdout":
         # regression cannot be stratified on a continuous target (ADR-0020 §4 regression path)
         splitter = HoldoutSplitter(

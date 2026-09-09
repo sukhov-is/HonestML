@@ -395,16 +395,49 @@ def test_tuned_n_estimators_overrides_default_catboost_style(monkeypatch) -> Non
     assert "n_estimators" not in est._model.kwargs
 
 
-def test_es_ceiling_overrides_tuned_n_estimators(monkeypatch) -> None:
-    # F029: on the ES path the caller passes the generous _N_ESTIMATORS_ES ceiling (ADR-0080), which
-    # must WIN over a tuned n_estimators — `_make(n_estimators=...)` is applied after **params, so a
-    # tuned count no longer silently caps the ES tree budget. The no-ES path keeps the tuned override.
-    backend = _fake_backend(monkeypatch)  # n_estimators_kwarg="n_estimators"
-    est = build_boosting(backend, task=Task(kind="binary"), random_state=7, n_estimators=77)
-    assert est._make(n_estimators=_N_ESTIMATORS_ES).kwargs["n_estimators"] == _N_ESTIMATORS_ES
-    assert (
-        est._make().kwargs["n_estimators"] == 77
-    )  # no-ES path: the tuned count still overrides 300
+@pytest.mark.parametrize("backend", [CATBOOST, LIGHTGBM, XGBOOST])
+@pytest.mark.parametrize("ceiling", [7, 19])
+def test_tuned_iteration_ceiling_reaches_native_es_fit(
+    backend: _Backend, ceiling: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rec, seen = _recording_clf()
+    if backend.module == "lightgbm":
+        monkeypatch.setitem(
+            sys.modules,
+            "lightgbm",
+            types.SimpleNamespace(
+                early_stopping=lambda *a, **k: None, log_evaluation=lambda *a: None
+            ),
+        )
+    est = _BoostingClassifier(backend, rec, 7, {backend.n_estimators_kwarg: ceiling})
+    X = np.zeros((12, 2))
+    y = np.array([0, 1] * 6)
+    est.fit(X[:8], y[:8], X_val=X[8:], y_val=y[8:])
+    assert est.native_model().kwargs[backend.n_estimators_kwarg] == ceiling
+    assert "eval_set" in seen
+
+
+@pytest.mark.parametrize("backend", [CATBOOST, LIGHTGBM, XGBOOST])
+@pytest.mark.parametrize("kind", ["binary", "regression", "multiclass"])
+def test_native_iteration_count_transfers_to_refit(backend: _Backend, kind: str) -> None:
+    pytest.importorskip(backend.module)
+    rng = np.random.default_rng(73)
+    X = rng.normal(size=(90, 3))
+    y = X[:, 0] if kind == "regression" else np.arange(90) % (3 if kind == "multiclass" else 2)
+    params = {backend.n_estimators_kwarg: 7}
+    dev = build_boosting(backend, task=Task(kind=kind), random_state=0, **params)
+    assert dev.fitted_iterations is None and dev.iteration_budget is None
+    dev.fit(X[:60], y[:60], X_val=X[60:], y_val=y[60:])
+    assert dev.iteration_budget == 7
+    count = dev.fitted_iterations
+    assert count is not None and 1 <= count <= 7
+    expected = _best_iteration(dev.native_model(), backend.module)
+    assert count == expected + (0 if backend.module == "lightgbm" else 1)
+    refit = build_boosting(backend, task=Task(kind=kind), random_state=0, **params)
+    refit.set_refit_iterations(count)
+    refit.fit(X, y)
+    assert refit.native_model().get_params()[backend.n_estimators_kwarg] == count
+    assert refit.fitted_iterations == count
 
 
 def test_catboost_subsample_pairs_bernoulli_for_multiclass_only() -> None:
@@ -583,3 +616,44 @@ def test_catboost_multiclass_subsample_fits() -> None:
     est.fit(X, y)  # must NOT raise
     assert est.predict_proba(X).shape == (150, 3)
     assert est._model.get_all_params()["bootstrap_type"] == "Bernoulli"
+
+
+@pytest.mark.parametrize("backend", [CATBOOST, LIGHTGBM, XGBOOST])
+def test_run_thread_limit_reaches_native_constructor(backend: _Backend) -> None:
+    est = _BoostingClassifier(backend, _FakeClf, 0)
+    est.set_threads(2)
+    est.fit(np.zeros((6, 2)), np.array([0, 1] * 3))
+    key = "thread_count" if backend.module == "catboost" else "n_jobs"
+    assert est.native_model().kwargs[key] == 2
+
+
+@pytest.mark.parametrize("backend", [CATBOOST, LIGHTGBM, XGBOOST], ids=lambda b: b.module)
+@pytest.mark.parametrize("early_stopping", [False, True])
+def test_planned_iteration_limit_matches_completed_native_budget(
+    backend: _Backend, early_stopping: bool
+) -> None:
+    pytest.importorskip(backend.module)
+    from honestml.core.ports.estimator import SupportsIterationPlan
+
+    model = build_boosting(backend, task=Task(kind="regression"), random_state=4)
+    assert isinstance(model, SupportsIterationPlan)
+    assert model.iteration_budget is None
+    assert model.iteration_limit(early_stopping=early_stopping) == (
+        boosting_mod._N_ESTIMATORS_ES if early_stopping else boosting_mod._N_ESTIMATORS
+    )
+    model.set_refit_iterations(9)
+    assert model.iteration_limit(early_stopping=early_stopping) == 9
+    model = build_boosting(
+        backend,
+        task=Task(kind="regression"),
+        random_state=4,
+        **{backend.n_estimators_kwarg: 7},
+    )
+    model.set_threads(1)
+    assert model.iteration_limit(early_stopping=early_stopping) == 7
+    assert model.iteration_budget is None
+    x = np.random.default_rng(4).normal(size=(60, 2))
+    y = x[:, 0]
+    validation = {"X_val": x[40:], "y_val": y[40:]} if early_stopping else {}
+    model.fit(x[:40], y[:40], **validation)
+    assert model.iteration_budget == model.iteration_limit(early_stopping=early_stopping) == 7

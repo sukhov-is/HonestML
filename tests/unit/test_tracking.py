@@ -22,6 +22,9 @@ from sklearn.datasets import make_classification
 
 from honestml import AutoML, ConfigError, CVConfig, MissingDependencyError, TrackerConfig
 from honestml.adapters import tracking
+from honestml.composition import facade as facade_module
+from honestml.core import BudgetConfig, SearchConfig
+from honestml.core import context as context_module
 
 pytestmark = pytest.mark.unit
 
@@ -62,6 +65,49 @@ def test_stub_instance_receives_deepcopy_of_report() -> None:
     assert report["config"] is not model.run_report_["config"]
     report["winner"] = "corrupted"
     assert model.run_report_["winner"] != "corrupted"
+
+
+@pytest.mark.parametrize("tracking_fails", [False, True])
+def test_tracking_publishes_frozen_training_cost_and_search_budget(
+    monkeypatch: pytest.MonkeyPatch, tracking_fails: bool
+) -> None:
+    clock = [0.0]
+    monkeypatch.setattr(context_module, "time", SimpleNamespace(perf_counter=lambda: clock[0]))
+    build_report = facade_module.build_run_report
+
+    def assemble_report(**kwargs: Any) -> dict[str, Any]:
+        report = build_report(**kwargs)
+        clock[0] += 10007.0
+        return report
+
+    monkeypatch.setattr(facade_module, "build_run_report", assemble_report)
+
+    class DelayedTracker(_StubTracker):
+        def log_run(self, report: dict[str, Any]) -> None:
+            super().log_run(report)
+            clock[0] += 20000.0
+            if tracking_fails:
+                raise RuntimeError("publication failed")
+
+    tracker = DelayedTracker()
+    search = SearchConfig(max_rows=32)
+    x, y = _data()
+    model = AutoML(
+        task="binary",
+        models=("baseline",),
+        cv=CVConfig(n_splits=2),
+        significance="off",
+        search=search,
+        budget=BudgetConfig(mode="time", time_budget_s=10000.0),
+        tracker=tracker,
+        random_state=0,
+    ).fit(x, y)
+
+    assert tracker.reports == [model.run_report_]
+    assert model.run_report_["cost"]["total_wall_s"] == 10007.0
+    assert model.run_report_["search"]["total_budget_s"] == 10000.0
+    assert model.run_report_["search"]["overshoot_s"] == 7.0
+    assert model.run_report_["search"]["reserved_finish_s"] == (10000.0 * search.reserve_fraction)
 
 
 def test_raising_tracker_is_fail_soft(caplog) -> None:

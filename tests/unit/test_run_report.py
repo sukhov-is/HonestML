@@ -543,3 +543,15 @@ def test_report_with_cache_keys_json_serializable() -> None:
         run_config=RunConfig(), timings={}, result=result, run_fingerprint="fp", cache_enabled=True
     )
     assert _json.loads(_json.dumps(report))["cache"]["reused"] == ["a"]
+
+
+def test_cost_block_is_detached_and_json_only() -> None:
+    from honestml.core import RunContext
+
+    ctx = RunContext()
+    ctx.record_fit("cv", model_id="linear", elapsed_s=0.01, rows=12, columns=3, fold=0)
+    cost = ctx.cost_report()
+    report = build_run_report(run_config=RunConfig(), timings={}, result=_result(), cost=cost)
+    cost["work"][0]["rows"] = 999
+    assert report["cost"]["work"][0]["rows"] == 12
+    assert json.loads(json.dumps(report))["cost"]["fit_counts"]["attempted"] == 1

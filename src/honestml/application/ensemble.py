@@ -30,6 +30,7 @@ from honestml.core import (
     get_logger,
 )
 from honestml.core.config import SignificanceMode
+from honestml.core.ports.metric import _EnsembleScoreMetric
 
 from .projection import _PROBA_NEEDS, _scorer_setup
 from .slice import EstimatorFactory, refit_best
@@ -150,12 +151,22 @@ def ensemble_selection(
             channel, metric, kind=kind, is_clf=is_clf, classes=classes, positive=positive
         )
 
+    prepare = metric._prepare_ensemble_score if isinstance(metric, _EnsembleScoreMetric) else None
+    prepared = (
+        prepare(yt, sw)
+        if prepare is not None and getattr(prepare, "__self__", None) is metric
+        else None
+    )
+
     def score(blended: np.ndarray) -> float:
-        return sign * float(metric.score(yt, project(blended), sw))
+        prediction = project(blended)
+        value = prepared(prediction) if prepared is not None else metric.score(yt, prediction, sw)
+        return sign * float(value)
 
     recipe = ensembler.combine(
         oof, yt, score=score, member_ids=member_ids, random_state=random_state, sample_weight=sw
     )
+    prepared = None
 
     # a degenerate recipe (all mass on one member) is not an ensemble -> ship the single (ADR-0063 §5)
     active = [mid for mid in member_ids if recipe.weights[mid] > _W_EPS]

@@ -145,15 +145,13 @@ compact point is kept only when it is **non-inferior** to the best point on the
 trajectory — its bootstrap lower bound stays within `refine_tol` (default `0.01`,
 a fraction of the best score). When the data is small or noisy the test loses
 power, that bound drops, and the descent **stops early instead of collapsing to
-the floor** (the pre-1.1 rule over-pruned exactly there). A **mass floor**
-`refine_min_mass` (default `0.99`) guards the other failure mode: the descent
-never prunes below the features that carry that share of the stage-1 importance,
-so the subset stays honest even when the cheap ranker cannot tell two sizes
-apart. The effective floor is `max(min_features, seq_min_features, mass_floor)`.
-`refine_max_features` (default 200) caps the survivor set the cascade starts
-from; `refine=False` restores the pre-1.1 single-cut behaviour (ship exactly the
-`cutoff` subset), and `refine_tol=0` / `refine_min_mass=0` disable the two
-adaptive guards individually.
+the floor**. `refine_min_mass` задаёт долю importance для дополнительного
+порога числа признаков; по умолчанию это `0.99`. Эффективный порог учитывает
+`min_features`, `seq_min_features` и mass floor. `refine_max_features`
+ограничивает стартовую ширину уточнения. `refine=False` оставляет пороговый
+subset без refinement, но последующий широкий контроль может вернуть полный
+набор. `refine_tol=0` задаёт нулевой допуск, `refine_min_mass=0` отключает
+mass floor. Эти правила не гарантируют внешнее качество subset.
 
 `"sequential"` is a different kind of strategy: a greedy wrapper that scores
 whole subsets along a backward trajectory rather than ranking features, so
@@ -165,8 +163,10 @@ rather than the optimistic out-of-fold argmax; `significance="off"` restores the
 plain argmax (with `seq_patience` early-stopping the descent). The band outcome
 is disclosed as `seq_band` in the report.
 
-The kept subset is attached to the schema (so training and inference can never
-diverge) and disclosed in `run_report_["feature_selection"]`.
+Итоговый набор признаков отражается в schema и отчёте. В ограниченном поиске
+широкий контроль может сохранить полный набор и исходную фабрику.
+`run_report_["feature_selection"]=None` описывает итог и не означает нулевую
+стоимость FS/HPO: выполненная работа раскрыта в `cost.work` и таймингах.
 
 ```python
 import numpy as np
@@ -210,8 +210,8 @@ folds and uses the significance band to prefer the most compact subset among
 the statistically indistinguishable ones; `"auto"` resolves to the most honest
 locus the data size can afford. The whole record — the strategies evaluated,
 their per-strategy scores and the winner — lands in
-`run_report_["feature_selection"]`, and only the winning subset ships in the
-schema.
+`run_report_["feature_selection"]`. Итоговая schema учитывает последующий
+широкий контроль; победа стратегии среди subset не гарантирует его применение.
 
 ```python
 import numpy as np

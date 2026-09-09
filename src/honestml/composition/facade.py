@@ -11,7 +11,7 @@ single inference path (shared with the standalone artifact).
 from __future__ import annotations
 
 import copy
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -32,18 +32,23 @@ from honestml.application import (
     run_slice,
     tune_estimators,
 )
+from honestml.application.slice import search_completed
+from honestml.application.tuning import profile_tuning_cost
 from honestml.core import (
     BudgetConfig,
+    BudgetExhaustedError,
     ConfigError,
     CVConfig,
     EnsembleConfig,
     ExperimentTracker,
+    FeatureRanker,
     FeatureSelectionConfig,
     FEConfig,
     HPOConfig,
     NotFittedError,
     RunConfig,
     RunContext,
+    SearchConfig,
     Task,
     TimeOrderedSplitter,
     TrackerConfig,
@@ -51,6 +56,13 @@ from honestml.core import (
     get_logger,
 )
 from honestml.core.config import RunMode, SignificanceMode
+from honestml.core.ports.estimator import (
+    SupportsFitContext,
+    SupportsIterationBudget,
+    SupportsRankerBudget,
+    SupportsThreadLimit,
+)
+from honestml.core.ports.tuner import SupportsTuningCache
 
 if TYPE_CHECKING:
     from honestml.adapters import JoblibCandidateCache, RunBudget
@@ -61,7 +73,14 @@ if TYPE_CHECKING:
     from .build import Components
 
 from .artifact import FittedModel
-from .build import _normalize_cv, build_default_components, resolve_fs_defaults
+from .build import (
+    _make_strategy,
+    _normalize_cv,
+    _resolve_strategies,
+    build_default_components,
+    resolve_fs_defaults,
+)
+from .run_report import configure_run_cost
 
 logger = get_logger("composition.facade")
 
@@ -70,13 +89,24 @@ logger = get_logger("composition.facade")
 _ESTIMATOR_PACKAGES = {"catboost": "catboost", "lightgbm": "lightgbm", "xgboost": "xgboost"}
 
 
-def _packages_for(estimators: tuple[str, ...]) -> set[str]:
-    """Compute-stack distributions to version-pin in the fingerprint for the resolved estimators."""
+def _packages_for(
+    estimators: tuple[str, ...],
+    *,
+    hpo: HPOConfig | None = None,
+    feature_selection: FeatureSelectionConfig | None = None,
+) -> set[str]:
+    """Version-pin estimator libraries and active search backends for every cached stage."""
     packages = {"scikit-learn", "numpy"}
     for name in estimators:
         pkg = _ESTIMATOR_PACKAGES.get(name)
         if pkg is not None:
             packages.add(pkg)
+    if hpo is not None:
+        packages.add(hpo.backend)
+    if feature_selection is not None:
+        strategies = feature_selection.compare or (feature_selection.strategy,)
+        if "shap" in strategies:
+            packages.add("shap")
     return packages
 
 
@@ -107,8 +137,12 @@ def _hpo_report(
         "tuned": {
             name: {
                 "chosen_params": o.best_params,
-                "inner_best_score": o.best_score,
+                "inner_best_score": o.best_score if np.isfinite(o.best_score) else None,
                 "n_trials_run": o.n_trials_run,
+                "reused_trials": o.reused_trials,
+                "completed": o.completed,
+                "failed_trials": o.failed_trials,
+                "successful_trials": o.successful_trials,
             }
             for name, o in outcomes.items()
         },
@@ -207,6 +241,7 @@ class AutoML(BaseEstimator, ClassifierMixin):
         finalize: bool = True,
         tracker: ExperimentTracker | TrackerConfig | str | None = None,
         preset: str | Mapping[str, Any] | None = None,
+        search: SearchConfig | None = None,
     ) -> None:
         # store params verbatim — sklearn clone/get_params invariant (no computation here)
         self.task = task
@@ -250,6 +285,7 @@ class AutoML(BaseEstimator, ClassifierMixin):
         # explicit value always wins. Input sugar — the fingerprint carries the RESOLVED parameters,
         # not the preset name. Stored verbatim (a Mapping is snapshotted once per fit).
         self.preset = preset
+        self.search = search
 
     def fit(
         self,
@@ -272,6 +308,11 @@ class AutoML(BaseEstimator, ClassifierMixin):
         # validate run_mode here (not in __init__, which stores verbatim per the sklearn invariant): the
         # RunConfig is built by the direct constructor, so an invalid value must map to ConfigError, not a
         # raw pydantic ValidationError (ADR-0038 §1, by the cv<2 -> ConfigError precedent).
+        ctx = RunContext()
+        ctx.start_run()
+        configure_run_cost(ctx)
+        if self.search is not None and not isinstance(self.search, SearchConfig):
+            raise ConfigError("search must be a SearchConfig")
         if self.run_mode not in ("selection", "full"):
             raise ConfigError(f"run_mode must be 'selection' or 'full', got {self.run_mode!r}")
         task = self._resolve_task()
@@ -295,76 +336,162 @@ class AutoML(BaseEstimator, ClassifierMixin):
         # resolve tracker once, BEFORE reading data (ADR-0072 §2): a requested-but-impossible tracking
         # setup (missing mlflow, bad form) must fail fast, not after the expensive training.
         tracker = self._resolve_tracker()
-        ds_full = self._reader(task, fe).read(
-            X, y, sample_weight=sample_weight, groups=groups, time=time, label_time=label_time
-        )
-        classes = np.unique(ds_full.target()) if task.is_classification else None
-        # M6f (ADR-0057/0058): resolve data-shape "auto" sentinels + apply the hard cost-budget post-read,
-        # before build (the effective arbitration drives the arbitration splitter). effective_fs flows to
-        # build AND the RunConfig manifest (write-back); the record feeds the run-report fs_resolution block.
-        fs_resolution: dict[str, str] = {}
-        if fs is not None:
-            _cv = _normalize_cv(eff["cv"])
-            fs, fs_resolution = resolve_fs_defaults(
-                fs,
-                n_rows=ds_full.n_rows,
-                n_features=len(ds_full.schema.features),
-                inner_n_splits=_cv.n_splits,
-                times=ds_full.time() if ds_full.schema.time is not None else None,
-                scheme=_cv.scheme,
-                purge=_cv.purge,
-                purge_delta=_cv.purge_delta,
+        with ctx.timed_stage("run", "reader"):
+            ds_full = self._reader(task, fe).read(
+                X, y, sample_weight=sample_weight, groups=groups, time=time, label_time=label_time
             )
-        components = build_default_components(
-            task,
-            random_state=self.random_state,
-            metric=self.metric,
-            cv=eff["cv"],
-            models=eff["models"],
-            has_datetime=bool(ds_full.schema.datetime),
-            has_group=ds_full.schema.group is not None,
-            has_time=ds_full.schema.time is not None,
-            has_missing=bool(np.isnan(ds_full.to_numpy()).any()),
-            classes=classes,
-            significance=self.significance,
-            feature_selection=fs,
-            hpo=hpo,
-            ensemble=ensemble,
-        )
-        # honest-regime outer holdout (ADR-0029): carve once scheme-aware; selection/refit/calibration
-        # run on dev only, the winner is scored once on the untouched holdout. `ds` is dev (== full
-        # when off), so every line below is unchanged for the default outer_holdout=0.0.
-        holdout_ds: Dataset | None = None
-        if components.cv.outer_holdout > 0.0:
-            dev_idx, holdout_idx = self._carve_holdout(ds_full, task, components, classes)
-            if holdout_idx.size < _MIN_HOLDOUT_ROWS:
-                logger.warning(
-                    "outer holdout has only %d row(s); its score is high-variance — treat it "
-                    "as indicative, not final",
-                    holdout_idx.size,
+        with ctx.timed_stage("run", "preparation"):
+            classes = np.unique(ds_full.target()) if task.is_classification else None
+            # M6f (ADR-0057/0058): resolve data-shape "auto" sentinels + apply the hard cost-budget post-read,
+            # before build (the effective arbitration drives the arbitration splitter). effective_fs flows to
+            # build AND the RunConfig manifest (write-back); the record feeds the run-report fs_resolution block.
+            fs_resolution: dict[str, str] = {}
+            if fs is not None:
+                _cv = _normalize_cv(eff["cv"])
+                fs, fs_resolution = resolve_fs_defaults(
+                    fs,
+                    n_rows=ds_full.n_rows,
+                    n_features=len(ds_full.schema.features),
+                    inner_n_splits=_cv.n_splits,
+                    times=ds_full.time() if ds_full.schema.time is not None else None,
+                    scheme=_cv.scheme,
+                    purge=_cv.purge,
+                    purge_delta=_cv.purge_delta,
                 )
-            ds = ds_full.take(dev_idx)
-            holdout_ds = ds_full.take(holdout_idx)
-        else:
-            ds = ds_full
-        _validate_cv_data_floor(components.cv, ds)
-        _warn_degenerate_es_tail(components.cv, ds.n_rows, components.early_stopping)
+            components = build_default_components(
+                task,
+                random_state=self.random_state,
+                metric=self.metric,
+                cv=eff["cv"],
+                models=eff["models"],
+                has_datetime=bool(ds_full.schema.datetime),
+                has_group=ds_full.schema.group is not None,
+                has_time=ds_full.schema.time is not None,
+                has_missing=bool(np.isnan(ds_full.to_numpy()).any()),
+                classes=classes,
+                significance=self.significance,
+                feature_selection=fs,
+                hpo=hpo,
+                ensemble=ensemble,
+            )
+            from honestml.adapters import make_ranker_fit_predict
+
+            threads = self.search.threads if self.search is not None else None
+            configured_strategies = list(components.feature_strategies or ())
+            if components.feature_ranker is not None:
+                configured_strategies.append(("ranker", components.feature_ranker))
+            for _, strategy in configured_strategies:
+                if isinstance(strategy, SupportsFitContext):
+                    strategy.set_run_context(ctx)
+                if threads is not None and isinstance(strategy, SupportsThreadLimit):
+                    strategy.set_threads(threads)
+            if components.feature_fit_predict is not None:
+                components = components._replace(
+                    feature_fit_predict=make_ranker_fit_predict(task, threads=threads, ctx=ctx)
+                )
+            if threads is not None:
+
+                def limit_factory(factory: EstimatorFactory) -> EstimatorFactory:
+                    def make() -> Estimator:
+                        estimator = factory()
+                        if isinstance(estimator, SupportsThreadLimit):
+                            estimator.set_threads(threads)
+                        return estimator
+
+                    return make
+
+                components = components._replace(
+                    estimators={
+                        name: limit_factory(factory)
+                        for name, factory in components.estimators.items()
+                    }
+                )
+            prefilter = None
+            probe_strategies = None
+            probe_fit_predict = None
+            if self.search is not None and fs is not None:
+                prefilter = _make_strategy(task, fs, "importance")
+                probe_config = fs.model_copy(
+                    update={
+                        "n_runs": min(fs.n_runs, 3),
+                        "n_probes": min(fs.n_probes, 3),
+                        "shap_max_samples": min(
+                            fs.shap_max_samples or self.search.max_rows, self.search.max_rows
+                        ),
+                        "shap_background_samples": min(
+                            fs.shap_background_samples or self.search.max_rows, self.search.max_rows
+                        ),
+                    }
+                )
+                probe_strategies = _resolve_strategies(task, probe_config)
+                probe_fit_predict = make_ranker_fit_predict(
+                    task, threads=threads, ctx=ctx, n_estimators=self.search.model_iterations
+                )
+                for _, strategy in [("prefilter", prefilter), *probe_strategies]:
+                    if isinstance(strategy, SupportsRankerBudget):
+                        strategy.set_ranker_iterations(self.search.model_iterations)
+                    if isinstance(strategy, SupportsFitContext):
+                        strategy.set_run_context(ctx)
+                    if isinstance(strategy, SupportsThreadLimit):
+                        strategy.set_threads(self.search.threads)
+                execution_ranker: FeatureRanker | None = None
+                if components.feature_ranker is not None:
+                    ranker_strategy = probe_strategies[0][1]
+                    assert isinstance(ranker_strategy, FeatureRanker)
+                    execution_ranker = ranker_strategy
+                components = components._replace(
+                    feature_strategies=probe_strategies
+                    if components.feature_strategies is not None
+                    else None,
+                    feature_ranker=execution_ranker,
+                    feature_fit_predict=probe_fit_predict,
+                )
+            # honest-regime outer holdout (ADR-0029): carve once scheme-aware; selection/refit/calibration
+            # run on dev only, the winner is scored once on the untouched holdout. `ds` is dev (== full
+            # when off), so every line below is unchanged for the default outer_holdout=0.0.
+            holdout_ds: Dataset | None = None
+            if components.cv.outer_holdout > 0.0:
+                dev_idx, holdout_idx = self._carve_holdout(ds_full, task, components, classes)
+                if holdout_idx.size < _MIN_HOLDOUT_ROWS:
+                    logger.warning(
+                        "outer holdout has only %d row(s); its score is high-variance — treat it "
+                        "as indicative, not final",
+                        holdout_idx.size,
+                    )
+                ds = ds_full.take(dev_idx)
+                holdout_ds = ds_full.take(holdout_idx)
+            else:
+                ds = ds_full
+            _validate_cv_data_floor(components.cv, ds)
+            _warn_degenerate_es_tail(components.cv, ds.n_rows, components.early_stopping)
         budget_config = self._resolve_budget(eff["budget"])
         # one cooperative budget shared by HPO and selection (ADR-0062 §5): tuning consumes from the same
         # pool, so a tiny budget cuts trials AND candidates; refit below is never budget-gated.
         budget = self._build_budget(budget_config)
-        ctx = RunContext(
-            run_config=RunConfig(
-                seed=self.random_state,
-                cv=components.cv,
-                budget=budget_config,
-                hpo=hpo,
-                ensemble=ensemble,
-                significance=self.significance,
-                run_mode=self.run_mode,
-                fe=fe,
-                fs=fs,
-            )
+        if self.search is not None and budget is not None:
+            budget.start(elapsed_s=ctx.cost_report()["total_wall_s"])
+            if budget_config.time_budget_s is not None:
+                budget.reserve(budget_config.time_budget_s * self.search.reserve_fraction)
+        if self.search is not None and budget is not None:
+
+            def check_memory(stage: str) -> None:
+                headroom = budget.memory_left()
+                if headroom is not None and headroom <= 0:
+                    raise BudgetExhaustedError("memory", completed=0, skipped=1, failed=0)
+
+            ctx.before_fit = check_memory
+        ctx.run_config = RunConfig(
+            seed=self.random_state,
+            model_types=tuple(components.estimators),
+            cv=components.cv,
+            budget=budget_config,
+            hpo=hpo,
+            ensemble=ensemble,
+            significance=self.significance,
+            run_mode=self.run_mode,
+            fe=fe,
+            fs=fs,
+            search=self.search,
         )
         # M7a HPO (ADR-0102, supersedes ADR-0062 §2a): tuning runs INSIDE run_slice after the FS
         # projection (post-FS objective width), in BOTH run_modes; the tuned factories are folded
@@ -374,58 +501,132 @@ class AutoML(BaseEstimator, ClassifierMixin):
         )
         # run-fingerprint over the resolved inputs + the DEV data signature (ADR-0035 §2/§3, post-carve);
         # always computed (for the run-report), used as the cache scope only when cache is enabled.
-        run_fingerprint = self._run_fingerprint(ctx.run_config, task, components, ds, hpo=hpo)
-        cache = self._build_cache(run_fingerprint)
-        with ctx.timed_stage("run", "selection"):
-            result = run_slice(
-                ds,
+        completion_refit_rows = (
+            (ds.n_rows,) + ((ds_full.n_rows,) if holdout_ds is not None and self.finalize else ())
+            if self.run_mode == "full"
+            else ()
+        )
+        with ctx.timed_stage("run", "fingerprint"):
+            run_fingerprint = self._run_fingerprint(
+                ctx.run_config,
                 task,
-                estimators=components.estimators,
-                splitter=components.splitter,
-                metric=components.metric,
-                policy=components.policy,
-                significance_test=components.significance,
-                calibrator_factory=components.refinement_calibrator,
-                selection=components.selection,
-                refinement_min_oof=components.refinement_min_oof,
-                weighting=components.weighting,
-                # an ensemble run needs the per-candidate proba channel to blend (classification), like
-                # refinement/calibration (ADR-0063 §2); for regression it reuses the band's value OOF.
-                capture_proba=(
-                    components.selection == "refinement"
-                    or components.calibrate != "off"
-                    or ensemble is not None
-                ),
-                fe=fe,
-                features=(
-                    FeatureSelectionBundle(
-                        config=components.feature_selection,
-                        ranker=components.feature_ranker,
-                        strategies=components.feature_strategies,
-                        carve=components.feature_carve,
-                        fit_predict=components.feature_fit_predict,
-                        arbitration_splitter=components.feature_arbitration_splitter,
-                    )
-                    if components.feature_selection is not None
-                    else None
-                ),
-                tuning=tuning_bundle,
-                budget=budget,
-                cache=cache,
-                ctx=ctx,
+                components,
+                ds,
+                hpo=hpo,
+                completion_refit_rows=completion_refit_rows,
             )
+        if self.cache is not None and isinstance(components.tuner, SupportsTuningCache):
+            components.tuner.configure_cache(str(self.cache), run_fingerprint)
+        cache = self._build_cache(run_fingerprint)
+        from honestml.application import SliceResult
+
+        restored = cache.get_stage("selection") if cache is not None else None
+        if isinstance(restored, SliceResult):
+            result = restored
+            result.reused = tuple(c.id for c in result.candidates)
+            result.computed = ()
+            if result.hpo is not None:
+                result.hpo = {
+                    name: replace(outcome, reused_trials=outcome.n_trials_run)
+                    for name, outcome in result.hpo.items()
+                }
+            if result.search is not None:
+                result.search = {**result.search, "stage_reused": True}
+        else:
+            with ctx.timed_stage("run", "selection"):
+                result = run_slice(
+                    ds,
+                    task,
+                    estimators=components.estimators,
+                    splitter=components.splitter,
+                    metric=components.metric,
+                    policy=components.policy,
+                    significance_test=components.significance,
+                    calibrator_factory=components.refinement_calibrator,
+                    selection=components.selection,
+                    refinement_min_oof=components.refinement_min_oof,
+                    weighting=components.weighting,
+                    # an ensemble run needs the per-candidate proba channel to blend (classification), like
+                    # refinement/calibration (ADR-0063 §2); for regression it reuses the band's value OOF.
+                    capture_proba=(
+                        components.selection == "refinement"
+                        or components.calibrate != "off"
+                        or ensemble is not None
+                    ),
+                    fe=fe,
+                    features=(
+                        FeatureSelectionBundle(
+                            config=components.feature_selection,
+                            execution_resources={
+                                "n_runs": min(components.feature_selection.n_runs, 3),
+                                "n_probes": min(components.feature_selection.n_probes, 3),
+                                "ranker_iterations": self.search.model_iterations,
+                            }
+                            if self.search is not None
+                            else None,
+                            prefilter=cast("FeatureRanker | None", prefilter),
+                            probe_strategies=probe_strategies,
+                            probe_fit_predict=probe_fit_predict,
+                            ranker=components.feature_ranker,
+                            strategies=components.feature_strategies,
+                            carve=components.feature_carve,
+                            fit_predict=components.feature_fit_predict,
+                            arbitration_splitter=components.feature_arbitration_splitter,
+                        )
+                        if components.feature_selection is not None
+                        else None
+                    ),
+                    tuning=tuning_bundle,
+                    search=self.search,
+                    completion_refit_rows=completion_refit_rows,
+                    budget=budget,
+                    cache=cache,
+                    stage_cache=cache,
+                    ctx=ctx,
+                )
+            if (
+                cache is not None
+                and not result.budget.exhausted
+                and not result.failed
+                and search_completed(result.search)
+            ):
+                hpo_complete = all(outcome.completed for outcome in (result.hpo or {}).values())
+                if hpo_complete:
+                    cache.put_stage("selection", result)
         # fold the tuned factories into components.estimators BEFORE ensemble/ship/finalize — the
         # refits pull from this mapping, so skipping this would ship an UNTUNED winner (ADR-0102).
         hpo_report: dict[str, Any] | None = None
         if tuning_bundle is not None and hpo is not None:
             outcomes = result.hpo or {}
-            components.estimators.update(tuning_bundle.tuned_factories(outcomes))
+            if not (result.search is not None and result.search.get("use_original_factory")):
+                components.estimators.update(tuning_bundle.tuned_factories(outcomes))
             hpo_report = _hpo_report(
                 hpo,
                 outcomes,
-                tuned_on="fs_subset" if result.feature_selection is not None else "dev_full",
+                tuned_on="fs_subset"
+                if (
+                    result.search.get("hpo_on_subset")
+                    if result.search is not None
+                    else result.feature_selection is not None
+                )
+                else "dev_full",
                 time_budget=budget is not None and budget.mode == "time",
             )
+
+        def refit_factory(factory: EstimatorFactory, iterations: int) -> EstimatorFactory:
+            def make() -> Estimator:
+                estimator = factory()
+                if isinstance(estimator, SupportsIterationBudget):
+                    estimator.set_refit_iterations(iterations)
+                return estimator
+
+            return make
+
+        for candidate in result.candidates:
+            if candidate.refit_iterations is not None:
+                components.estimators[candidate.id] = refit_factory(
+                    components.estimators[candidate.id], candidate.refit_iterations
+                )
         # cache observability (F4.7): a cold run next to other fingerprint directories means the
         # resolved config or the data signature changed — name the fingerprint so the user can
         # diff the two run_report configs instead of guessing why everything recomputed.
@@ -463,8 +664,8 @@ class AutoML(BaseEstimator, ClassifierMixin):
         # a model. The post-selection stages run only for "full".
         ship_model = self.run_mode == "full"
         if ship_model:
-            # refit is NOT budget-gated: graceful degradation must ship a working model (ADR-0032 §1). When
-            # the ensemble was applied, refit its members on full-DEV and ship a BlendedEstimator instead.
+            # refit is protected from the search time-budget stop; memory checkpoints still apply.
+            # an applied ensemble refits its members on full-DEV and ships a BlendedEstimator.
             # _ship_estimator returns the post-refit ensemble provenance block too (C13).
             best, ensemble_outcome, ensemble_block = self._ship_estimator(
                 ds, task, result, components, ensemble_outcome, classes, ctx
@@ -539,6 +740,7 @@ class AutoML(BaseEstimator, ClassifierMixin):
         self.run_report_ = build_run_report(
             run_config=ctx.run_config,
             timings=ctx.timings,
+            cost=ctx.cost_report(),
             result=result,
             run_fingerprint=run_fingerprint,
             cache_enabled=self.cache is not None,
@@ -555,6 +757,22 @@ class AutoML(BaseEstimator, ClassifierMixin):
         optimism = self.run_report_.get("holdout_optimism")
         if optimism is not None:
             logger.warning("%s", optimism["message"])
+        if result.search is not None:
+            self.run_report_["search"] = result.search
+            if budget_config.time_budget_s is not None:
+                result.search["total_budget_s"] = budget_config.time_budget_s
+                assert self.search is not None
+                result.search["reserved_finish_s"] = (
+                    budget_config.time_budget_s * self.search.reserve_fraction
+                )
+        # training wall time includes report assembly; publication uses the frozen snapshot.
+        ctx.finish_run()
+        cost = ctx.cost_report()
+        self.run_report_["cost"] = cost
+        if result.search is not None and budget_config.time_budget_s is not None:
+            result.search["overshoot_s"] = max(
+                0.0, cost["total_wall_s"] - budget_config.time_budget_s
+            )
         # post-fit one-shot tracking (ADR-0072 §2): the tracker consumes a DEEP COPY (a mutating
         # implementation cannot corrupt run_report_); a tracking failure must not destroy a finished
         # fit — the only place an exception is downgraded to WARNING (external-service boundary).
@@ -616,16 +834,29 @@ class AutoML(BaseEstimator, ClassifierMixin):
         if hpo is None or components.tuner is None:
             return None
         assert components.make_factory is not None and components.inner_splitter is not None
-        make_factory = components.make_factory
+        base_make_factory = components.make_factory
+
+        def make_factory(name: str, params: Mapping[str, Any]) -> EstimatorFactory:
+            original = base_make_factory(name, params)
+
+            def make() -> Estimator:
+                estimator = original()
+                if self.search is not None and isinstance(estimator, SupportsThreadLimit):
+                    estimator.set_threads(self.search.threads)
+                return estimator
+
+            return make
+
         tuner = components.tuner
         inner_splitter = components.inner_splitter
+        tunable = dict(components.tunable or {})
 
         def tune(ds_dev: Dataset, selected: tuple[str, ...] | None) -> dict[str, TuneOutcome]:
             with ctx.timed_stage("run", "hpo"):
                 return tune_estimators(
                     ds_dev,
                     task,
-                    tunable=components.tunable or {},
+                    tunable=tunable,
                     make_factory=make_factory,
                     tuner=tuner,
                     metric=components.metric,
@@ -647,12 +878,65 @@ class AutoML(BaseEstimator, ClassifierMixin):
         def tuned_factories(
             outcomes: dict[str, TuneOutcome],
         ) -> dict[str, EstimatorFactory]:
-            return {
+            factories = {
                 (f"{name}__tuned" if hpo.keep_baseline else name): make_factory(name, o.best_params)
                 for name, o in outcomes.items()
+                if o.successful_trials > 0
             }
+            if self.search is None:
+                return factories
 
-        return TuningBundle(tune=tune, tuned_factories=tuned_factories)
+            threads = self.search.threads
+
+            def limited(factory: EstimatorFactory) -> EstimatorFactory:
+                def make() -> Estimator:
+                    est = factory()
+                    if isinstance(est, SupportsThreadLimit):
+                        est.set_threads(threads)
+                    return est
+
+                return make
+
+            return {name: limited(factory) for name, factory in factories.items()}
+
+        def select_models(names: tuple[str, ...]) -> None:
+            for name in tuple(tunable):
+                if name not in names:
+                    del tunable[name]
+
+        def profile_cost(
+            ds_dev: Dataset,
+            names: tuple[str, ...],
+            can_start: Callable[[], bool],
+        ) -> dict[str, dict[str, object]]:
+            assert self.search is not None
+            return profile_tuning_cost(
+                ds_dev,
+                task,
+                tunable={name: tunable.get(name, {}) for name in names},
+                make_factory=make_factory,
+                metric=components.metric,
+                policy=components.policy,
+                inner_splitter=inner_splitter,
+                n_trials=hpo.n_trials,
+                timeout_s=hpo.timeout_s,
+                random_state=hpo.random_state
+                if hpo.random_state is not None
+                else self.random_state,
+                search=self.search,
+                fe=fe,
+                sample_weight=ds_dev.sample_weight(),
+                ctx=ctx,
+                can_start=can_start,
+            )
+
+        return TuningBundle(
+            tune=tune,
+            tuned_factories=tuned_factories,
+            select_models=select_models,
+            profile_cost=profile_cost if self.search is not None else None,
+            keep_baseline=hpo.keep_baseline,
+        )
 
     def _run_ensemble_stage(
         self,
@@ -939,11 +1223,13 @@ class AutoML(BaseEstimator, ClassifierMixin):
         ds: Dataset,
         *,
         hpo: HPOConfig | None = None,
+        completion_refit_rows: tuple[int, ...] = (),
     ) -> str:
         """Assemble the run-fingerprint over the resolved inputs + DEV signature.
 
         The data-signature is over ``ds`` (DEV, post-carve) — the exact dataset ``run_slice`` trains
-        on. ``lib_versions`` pins the resolved compute stack (estimator packages + sklearn + numpy);
+        on. ``lib_versions`` pins estimator libraries and active HPO/FS backends so their updates
+        invalidate prepared and completed selection stages;
         the pure assembler lives in ``application`` (sklearn is only version-read here, not imported).
         """
         from honestml.application import (
@@ -963,8 +1249,22 @@ class AutoML(BaseEstimator, ClassifierMixin):
             task=task,
             metric=components.metric,
             data_signature=dataset_signature(ds),
+            search_completion={
+                "run_mode": self.run_mode,
+                "finalize": self.finalize,
+                "refit_rows": completion_refit_rows,
+                "completion_cost_version": 2,
+            }
+            if self.search is not None
+            else None,
             estimators=estimators,
-            lib_versions=collect_lib_versions(_packages_for(estimators)),
+            lib_versions=collect_lib_versions(
+                _packages_for(
+                    estimators,
+                    hpo=run_config.hpo if components.tunable else None,
+                    feature_selection=run_config.fs,
+                )
+            ),
         )
 
     def _build_cache(self, fingerprint: str) -> JoblibCandidateCache | None:
@@ -1112,7 +1412,14 @@ class AutoML(BaseEstimator, ClassifierMixin):
             )
         with ctx.timed_stage("run", "refit"):
             best = refit_best(
-                ds, task, factory=components.estimators[result.best_model_id], ctx=ctx
+                ds,
+                task,
+                factory=components.estimators[result.best_model_id],
+                ctx=ctx,
+                iterations=next(
+                    c.refit_iterations for c in result.candidates if c.id == result.best_model_id
+                ),
+                model_id=result.best_model_id,
             )
         block = _ensemble_report(ensemble_outcome) if ensemble_outcome is not None else None
         return best, ensemble_outcome, block

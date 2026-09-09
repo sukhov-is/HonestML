@@ -29,13 +29,18 @@ not by widening an existing base Protocol — so existing plugins keep working.
 
 ## Persisted formats
 
-Two on-disk formats are covered by this policy:
+Постоянный артефакт модели и вычислительный кеш имеют разные правила загрузки:
 
-- the model artifact directory (manifest, schema, model body, leaderboard) written by
-  `save_artifact` and loaded as a `FittedModel` via `load_artifact`;
-- the on-disk candidate cache (`cache_dir/<fingerprint>/<candidate_id>/`).
+- Каталог модели (manifest, schema, model body, leaderboard), записанный
+  `save_artifact` и читаемый `load_artifact`, имеет `ARTIFACT_VERSION=1`.
+  Изменения формата требуют совместимости или миграции: модели предыдущих
+  выпусков должны оставаться загружаемыми в пределах одного MAJOR.
+  Неподдерживаемая версия артефакта вызывает явную ошибку.
+- Candidate/stage cache имеет `CACHE_VERSION=2`; несовместимые записи
+  считаются промахом и пересчитываются.
+- HPO checkpoint имеет формат 2; версия, вычислительный контекст и история
+  trials проверяются перед возобновлением. Несовместимая история пересчитывается.
 
-Changing a persisted format must be backward-compatible or come with a migration:
-artifacts saved by an earlier release stay loadable within the same MAJOR series.
-Both formats carry an integer version that gates loading — an artifact with an unsupported version is refused with a clear
-error, and an incompatible cache entry is treated as a miss and recomputed.
+Версии этих форматов независимы от версии пакета. Пересчёт кеша не отменяет
+обязательство совместимости сохранённых моделей. Кеш загружают только из
+доверенного каталога.

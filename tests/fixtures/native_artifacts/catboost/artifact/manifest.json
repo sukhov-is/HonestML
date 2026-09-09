@@ -36,10 +36,10 @@
   "checksums": {
     "algo": "sha256",
     "files": {
-      "schema.json": "90f2dab528f9d395157631dc7f48086522ab0d2a0460b0b9d58ccb989c8ecf7d",
-      "leaderboard.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "schema.json": "595a50958202c52f6c782c5c29608ee30f9e8bc7bef907b6f567058a2bc3d2f2",
+      "leaderboard.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
       "model.cbm": "fbfd523dd513a80173d89c90a26083f46cec8270a7cb2324f024ded1deba6759"
     },
-    "manifest": "c8ac0b9733bd966775c4f7883af7319a4baeaf217044437c74477bd26c3f30db"
+    "manifest": "ba103d993aa71fe5e126b1d316210d79453216a30f1de60593bedde5b5049c56"
   }
 }
