@@ -1,4 +1,4 @@
-"""The selected fast-search subset and DEV round count survive native artifact delivery."""
+"""The selected subset, factory refit budget and predictions survive native artifact delivery."""
 
 from __future__ import annotations
 
@@ -10,7 +10,8 @@ import pytest
 
 from honestml import AutoML
 from honestml.composition.artifact import load_artifact, save_artifact
-from honestml.core import CVConfig, FeatureSelectionConfig, SearchConfig
+from honestml.composition.build import build_default_components
+from honestml.core import CVConfig, FeatureSelectionConfig, SearchConfig, Task
 
 pytestmark = pytest.mark.unit
 
@@ -19,6 +20,10 @@ def test_fast_search_native_artifact_preserves_subset_rounds_and_predictions(
     tmp_path: Path,
 ) -> None:
     pytest.importorskip("lightgbm")
+    components = build_default_components(
+        Task(kind="regression"), random_state=5, models=("lightgbm",)
+    )
+    expected_budget = components.estimators["lightgbm"]().iteration_limit(early_stopping=False)
     rng = np.random.default_rng(19)
     x = pd.DataFrame(
         {
@@ -41,11 +46,12 @@ def test_fast_search_native_artifact_preserves_subset_rounds_and_predictions(
     assert model.run_report_["search"]["final_control"] == "selected_subset"
     selected = model.schema_.selected_features
     assert selected is not None and len(selected) == 1
-    dev_rounds = [
-        row["iterations"] for row in model.run_report_["cost"]["work"] if row["stage"] == "cv"
-    ]
-    expected_rounds = int(np.median(dev_rounds))
-    assert model.best_estimator_.fitted_iterations == expected_rounds
+    refits = [row for row in model.run_report_["cost"]["work"] if row["stage"] == "refit"]
+    assert len(refits) == 2
+    assert all(row["tree_budget"] == expected_budget for row in refits)
+    assert model.best_estimator_.iteration_budget == expected_budget
+    expected_rounds = model.best_estimator_.fitted_iterations
+    assert expected_rounds is not None and 0 < expected_rounds <= expected_budget
     assert model.shipped_on_ == "all"
     art = tmp_path / "native"
     save_artifact(model.fitted_, art, model_format="native")
