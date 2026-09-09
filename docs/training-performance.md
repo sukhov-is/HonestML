@@ -1,6 +1,6 @@
 # Стоимость обучения
 
-Руководство описывает ветку main. Возможности раздела Unreleased в [changelog](https://github.com/sukhov-is/HonestML/blob/main/CHANGELOG.md) доступны в исходниках до выпуска соответствующей версии PyPI. Инструменты benchmarks запускаются из checkout репозитория и не входят в wheel или sdist.
+Руководство описывает honestml 2.0.0. Изменения и переход с 1.x описаны в [changelog](https://github.com/sukhov-is/HonestML/blob/main/CHANGELOG.md). Инструменты benchmarks запускаются из checkout репозитория и не входят в wheel или sdist.
 
 Время обучения и качество измеряются отдельно от детерминированного honesty-бенчмарка.
 `benchmarks/training_cost.py` создаёт локальные отчёты производительности; `benchmarks/run.py`
