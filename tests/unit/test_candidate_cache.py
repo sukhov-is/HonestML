@@ -8,6 +8,7 @@ marker last (a crash before it is a miss), and confines candidate ids to the cac
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -25,6 +26,7 @@ def _candidate(id_: str = "m", score: float = 0.8) -> Candidate:
         score=score,
         n_features=3,
         train_time=0.12,
+        cv_iterations=7,
         oof_pred=np.linspace(0.0, 1.0, n),
         oof_mask=np.ones(n, dtype=bool),
         oof_proba=np.linspace(0.0, 1.0, n),
@@ -38,6 +40,7 @@ def test_put_get_round_trips_oof(tmp_path) -> None:
     got = cache.get("m")
     assert got is not None
     assert got.id == cand.id and got.score == cand.score and got.n_features == cand.n_features
+    assert got.cv_iterations == cand.cv_iterations == 7
     np.testing.assert_array_equal(got.oof_pred, cand.oof_pred)
     np.testing.assert_array_equal(got.oof_mask, cand.oof_mask)
     np.testing.assert_array_equal(got.oof_proba, cand.oof_proba)
@@ -68,11 +71,12 @@ def test_crash_before_meta_is_miss(tmp_path) -> None:
     assert JoblibCandidateCache(tmp_path, "fp").get("m") is None  # but no commit -> miss
 
 
-def test_version_mismatch_is_miss(tmp_path) -> None:
+@pytest.mark.parametrize("old_version", [2, CACHE_VERSION + 999])
+def test_version_mismatch_is_miss(tmp_path: Path, old_version: int) -> None:
     cache = JoblibCandidateCache(tmp_path, "fp")
     cache.put("m", _candidate())
     (tmp_path / "fp" / "m" / "meta.json").write_text(
-        json.dumps({"cache_version": CACHE_VERSION + 999}), encoding="utf-8"
+        json.dumps({"cache_version": old_version}), encoding="utf-8"
     )
     assert cache.get("m") is None  # incompatible format -> miss, not a crash
 

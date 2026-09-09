@@ -135,7 +135,7 @@ def test_cost_preference_requires_explicit_margin_and_paired_noninferiority() ->
             train_time=20.0 if name == "slow" else 1.0,
             oof_pred=y.copy(),
             oof_mask=mask,
-            refit_iterations=iterations,
+            cv_iterations=iterations,
         )
 
     result = probe_models(
@@ -184,3 +184,40 @@ def test_zero_margin_does_not_spend_quality_for_speed_without_evidence() -> None
 def test_confirmation_cannot_reduce_the_first_round_resource(field: str, value: int) -> None:
     with pytest.raises(ValueError, match="confirmation resource"):
         SearchConfig(max_folds=2, **{field: value})
+
+
+@pytest.mark.parametrize("unknown", ["anchor", "alternative"])
+def test_unknown_refit_cost_cannot_replace_score_anchor(unknown: str) -> None:
+    y = np.tile([0, 1], 700)
+
+    def evaluate(name: str, parts: Sequence[Fold], iterations: int) -> Candidate:
+        mask = np.zeros(len(y), dtype=bool)
+        for part in parts:
+            mask[part.test_idx] = True
+        return Candidate(
+            name,
+            0.9 if name == "anchor" else 0.895,
+            train_time=20.0 if name == "anchor" else 1.0,
+            oof_pred=y.copy(),
+            oof_mask=mask,
+            cv_iterations=None if name == unknown else 20,
+        )
+
+    result = probe_models(
+        ["anchor", "alternative"],
+        folds(),
+        y=y,
+        groups=None,
+        task=Task(kind="binary"),
+        metric=Metric(),
+        config=SearchConfig(model_margin=0.01),
+        seed=0,
+        evaluate=evaluate,
+        significance_test=Noninferiority(),
+        full_iterations={"anchor": 1000, "alternative": 1000},
+        full_refit_iterations={"anchor": 1000, "alternative": 1000},
+        completion_refit_rows=(1400,),
+    )
+    assert result.winner == "anchor"
+    assert result.cost_estimates[unknown] is None
+    assert result.reason == "incomplete_completion_cost"

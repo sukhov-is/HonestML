@@ -146,10 +146,9 @@ def test_real_hpo_stops_on_inner_es_and_refits_all_dev_rows() -> None:
     assert outcome.successful_trials == 1 and len(fits) == 3
     assert all(row["stage"] == "hpo" and row["rows"] == 72 for row in fits)
     assert all(0 < row["iterations"] < row["tree_budget"] == 100 for row in fits)
-    rounds = int(np.median([row["iterations"] for row in fits]))
-    refitted = refit_best(
-        ds, task, factory=make_factory("lightgbm", outcome.best_params), iterations=rounds, ctx=ctx
-    )
+    refitted = refit_best(ds, task, factory=make_factory("lightgbm", outcome.best_params), ctx=ctx)
     assert isinstance(refitted, SupportsIterationBudget)
-    assert refitted.fitted_iterations == rounds
+    assert refitted.iteration_budget == outcome.best_params["n_estimators"] == 100
+    assert refitted.fitted_iterations is not None and refitted.fitted_iterations <= 100
+    assert ctx.cost_report()["work"][-1]["tree_budget"] == 100
     assert ctx.cost_report()["work"][-1]["rows"] == 120

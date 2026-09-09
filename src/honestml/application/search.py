@@ -42,8 +42,8 @@ class ModelProbeOutcome:
     diagnostics: dict[str, list[dict[str, object]]] = field(default_factory=dict)
     issues: tuple[str, ...] = ()
     rank_changed: bool = False
-    cost_estimates: dict[str, float] = field(default_factory=dict)
-    initial_cost_estimates: dict[str, float] = field(default_factory=dict)
+    cost_estimates: dict[str, float | None] = field(default_factory=dict)
+    initial_cost_estimates: dict[str, float | None] = field(default_factory=dict)
     cost_model: dict[str, dict[str, object]] = field(default_factory=dict)
     completion_costs: dict[str, dict[str, object]] = field(default_factory=dict)
 
@@ -169,7 +169,7 @@ def _probe_diagnostics(
     return diagnostics, tuple(sorted(issues))
 
 
-def _completion_cost(
+def _cv_cost(
     candidate: Candidate,
     probe_folds: Sequence[Fold],
     completion_rows: int,
@@ -177,7 +177,7 @@ def _completion_cost(
     full_cap: int | None,
 ) -> float:
     probe_rows = sum(len(f.fit_idx) for f in probe_folds)
-    iterations = candidate.refit_iterations
+    iterations = candidate.cv_iterations
     iteration_scale = (
         max(1.0, full_cap / iterations)
         if full_cap is not None and iterations is not None and iterations >= iteration_cap
@@ -186,9 +186,32 @@ def _completion_cost(
     return candidate.train_time * completion_rows / max(1, probe_rows) * iteration_scale
 
 
+def _completion_cost(
+    candidate: Candidate,
+    probe_folds: Sequence[Fold],
+    completion_rows: int,
+    iteration_cap: int,
+    full_cap: int | None,
+    *,
+    refit_rows: int = 0,
+    refit_cap: int | None = None,
+) -> float | None:
+    iterations = candidate.cv_iterations
+    refit_scale = 1.0
+    if refit_rows > 0 and refit_cap is not None:
+        if iterations is None or iterations <= 0:
+            return None
+        refit_scale = refit_cap / iterations
+    probe_rows = sum(len(f.fit_idx) for f in probe_folds)
+    return (
+        _cv_cost(candidate, probe_folds, completion_rows, iteration_cap, full_cap)
+        + candidate.train_time / max(1, probe_rows) * refit_rows * refit_scale
+    )
+
+
 def _cost_winner(
     candidates: Sequence[Candidate],
-    costs: dict[str, float],
+    costs: dict[str, float | None],
     *,
     y: np.ndarray,
     metric: Metric,
@@ -198,10 +221,18 @@ def _cost_winner(
     sample_weight: np.ndarray | None,
 ) -> str:
     anchor = rank(candidates, SelectionPolicy(greater_is_better=metric.greater_is_better))[0]
+    anchor_cost = costs[anchor.id]
+    if anchor_cost is None:
+        return anchor.id
     sign = 1.0 if metric.greater_is_better else -1.0
-    eligible = [anchor]
+    eligible = [(anchor_cost, anchor.id)]
     for candidate in candidates:
-        if candidate.id == anchor.id or sign * (anchor.score - candidate.score) > margin:
+        candidate_cost = costs[candidate.id]
+        if (
+            candidate.id == anchor.id
+            or candidate_cost is None
+            or sign * (anchor.score - candidate.score) > margin
+        ):
             continue
         if (
             test is None
@@ -223,8 +254,8 @@ def _cost_winner(
             block_index=block_index[mask] if block_index is not None else None,
             sample_weight=sample_weight[mask] if sample_weight is not None else None,
         ):
-            eligible.append(candidate)
-    return min(eligible, key=lambda candidate: (costs[candidate.id], candidate.id)).id
+            eligible.append((candidate_cost, candidate.id))
+    return min(eligible)[1]
 
 
 def probe_models(
@@ -244,6 +275,7 @@ def probe_models(
     block_index: np.ndarray | None = None,
     times: np.ndarray | None = None,
     full_iterations: Mapping[str, int | None] | None = None,
+    full_refit_iterations: Mapping[str, int | None] | None = None,
     full_training_rows: Mapping[str, int] | None = None,
     completion_refit_rows: tuple[int, ...] = (),
     profile_completion: Callable[[tuple[str, ...]], Mapping[str, Mapping[str, object]]]
@@ -287,24 +319,27 @@ def probe_models(
         cap = full_iterations.get(name) if full_iterations is not None else None
         return min(cap, requested) if cap is not None else requested
 
-    def completion_rows(name: str) -> int:
-        training_rows = (
+    def cv_training_rows(name: str) -> int:
+        return (
             full_training_rows[name]
             if full_training_rows is not None
             else sum(len(f.fit_idx) for f in folds)
         )
-        return training_rows + sum(completion_refit_rows)
 
     def estimate(
         pool: Sequence[Candidate], parts: Sequence[Fold], requested: int
-    ) -> dict[str, float]:
+    ) -> dict[str, float | None]:
         return {
             c.id: _completion_cost(
                 c,
                 parts,
-                completion_rows(c.id),
+                cv_training_rows(c.id),
                 native_cap(c.id, requested),
                 full_iterations.get(c.id) if full_iterations is not None else None,
+                refit_rows=sum(completion_refit_rows),
+                refit_cap=full_refit_iterations.get(c.id)
+                if full_refit_iterations is not None
+                else None,
             )
             for c in pool
         }
@@ -371,7 +406,7 @@ def probe_models(
     cost_model: dict[str, dict[str, object]] = {}
     for candidate in confirmed:
         first = initial_by_name[candidate.id]
-        predicted = _completion_cost(
+        predicted = _cv_cost(
             first,
             bounded,
             sum(len(f.fit_idx) for f in confirmation),
@@ -382,7 +417,9 @@ def probe_models(
         )
         error = candidate.train_time - predicted
         cost_model[candidate.id] = {
-            "cv_training_rows": completion_rows(candidate.id) - sum(completion_refit_rows),
+            "status": "conditional" if costs[candidate.id] is not None else "unavailable",
+            "reason": "missing_cv_iterations" if costs[candidate.id] is None else None,
+            "cv_training_rows": cv_training_rows(candidate.id),
             "initial_training_rows": sum(len(f.fit_idx) for f in bounded),
             "confirmation_training_rows": sum(len(f.fit_idx) for f in confirmation),
             "initial_iteration_cap": native_cap(candidate.id, config.model_iterations)
@@ -393,6 +430,9 @@ def probe_models(
             else None,
             "full_iteration_cap": full_iterations.get(candidate.id)
             if full_iterations is not None
+            else None,
+            "full_refit_iteration_cap": full_refit_iterations.get(candidate.id)
+            if full_refit_iterations is not None
             else None,
             "initial_elapsed_s": first.train_time,
             "predicted_confirmation_s": predicted,
@@ -428,11 +468,20 @@ def probe_models(
             fs_s = cast(float | None, fs.get("estimated_s"))
             hpo_s = cast(float | None, hpo.get("estimated_s"))
             count = cast(int, profile.get("additional_cv_count", 0))
-            cv_rows = completion_rows(candidate.id) - sum(completion_refit_rows)
-            extra_cv = costs[candidate.id] * cv_rows / max(1, completion_rows(candidate.id)) * count
+            extra_cv = (
+                _cv_cost(
+                    candidate,
+                    confirmation,
+                    cv_training_rows(candidate.id),
+                    native_cap(candidate.id, config.confirmation_iterations),
+                    full_iterations.get(candidate.id) if full_iterations is not None else None,
+                )
+                * count
+            )
+            base_cost = costs[candidate.id]
             total = (
-                costs[candidate.id] + extra_cv + fs_s + hpo_s
-                if fs_s is not None and hpo_s is not None
+                base_cost + extra_cv + fs_s + hpo_s
+                if base_cost is not None and fs_s is not None and hpo_s is not None
                 else None
             )
             completion_costs[candidate.id] = {
@@ -477,7 +526,7 @@ def probe_models(
         "insufficient_confirmation"
         if issues
         else "incomplete_completion_cost"
-        if incomplete_cost
+        if incomplete_cost or any(cost is None for cost in selection_costs.values())
         else "confirmed_cost"
         if winner != anchor.id
         else "confirmation_score"

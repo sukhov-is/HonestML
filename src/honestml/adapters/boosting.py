@@ -9,8 +9,8 @@ library spans all task kinds; ``build`` picks the classifier (binary/multiclass)
 
 **Early stopping** (ADR-0080): when ``run_slice`` passes a carved ``X_val``/``y_val`` tail, the
 fit treats an explicit tree count as the upper bound and otherwise uses a generous ceiling, stopping
-on the native validation metric. Refit consumes the iteration count derived from DEV folds; without
-a tail or DEV count it falls back to the conservative fixed ``n_estimators`` and logs the
+on the native validation metric. Refit preserves configured parameters; without an explicit count
+it uses the conservative fixed ``n_estimators`` and logs the
 "no early stopping" advisory (ADR-0020 §2). When ``categorical_indices`` is injected (native-capable
 wrapper, ADR-0088/0089), CatBoost/LightGBM consume those columns natively (CatBoost int-cast Pool,
 LightGBM ``categorical_feature``); otherwise codes are fed as numeric. ``random_state`` maps to each
@@ -341,7 +341,7 @@ class _BoostingBase:
         return None
 
     def set_refit_iterations(self, count: int) -> None:
-        """Apply the DEV-derived number of boosting rounds to the next full-data fit."""
+        """Set an explicit iteration budget for the next fit."""
         self._params[self._backend.n_estimators_kwarg] = count
 
     def set_threads(self, threads: int) -> None:

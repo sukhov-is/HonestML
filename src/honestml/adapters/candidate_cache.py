@@ -31,7 +31,7 @@ from honestml.core import get_logger
 if TYPE_CHECKING:
     from honestml.core import Candidate
 
-CACHE_VERSION = 2
+CACHE_VERSION = 3
 _ENTRY_FILE = "entry.joblib"
 _META_FILE = "meta.json"
 

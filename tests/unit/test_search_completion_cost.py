@@ -26,7 +26,7 @@ def test_cost_uses_fit_only_probe_rows_and_model_specific_completion_plan() -> N
             name,
             0.9,
             train_time=2.0 if iterations == 64 else 18.0,
-            refit_iterations=min(1000, iterations),
+            cv_iterations=min(1000, iterations),
         )
 
     result = probe_models(
@@ -40,6 +40,7 @@ def test_cost_uses_fit_only_probe_rows_and_model_specific_completion_plan() -> N
         seed=1,
         evaluate=evaluate,
         full_iterations={"es": 1000, "plain": None},
+        full_refit_iterations={"es": 1000, "plain": None},
         full_training_rows={"es": 1600, "plain": 2000},
         completion_refit_rows=(1400, 1800),
     )
@@ -51,6 +52,103 @@ def test_cost_uses_fit_only_probe_rows_and_model_specific_completion_plan() -> N
     assert diagnostic["predicted_confirmation_s"] == pytest.approx(48.0)
     assert diagnostic["confirmation_error_s"] == pytest.approx(-30.0)
     assert diagnostic["confirmation_relative_error"] == pytest.approx(-30 / 48)
+
+
+@pytest.mark.parametrize("refit_cap", [1000, 10, None])
+def test_refit_cost_uses_configured_cap_after_probe_early_stopping(
+    refit_cap: int | None,
+) -> None:
+    calls: list[str] = []
+
+    def evaluate(name: str, parts: Sequence[Fold], iterations: int) -> Candidate:
+        calls.append(name)
+        return Candidate(name, 0.9, train_time=2.0 if iterations == 64 else 12.0, cv_iterations=20)
+
+    def profile_completion(names: tuple[str, ...]) -> dict[str, dict[str, object]]:
+        return {
+            name: {
+                "fs": {"estimated_s": 3.0},
+                "hpo": {"estimated_s": 5.0},
+                "additional_cv_count": 2,
+            }
+            for name in names
+        }
+
+    result = probe_models(
+        ["a", "b"],
+        folds(),
+        y=np.arange(1400.0),
+        groups=None,
+        task=Task(kind="regression"),
+        metric=Metric(),
+        config=SearchConfig(max_rows=100, confirmation_rows=600),
+        seed=1,
+        evaluate=evaluate,
+        full_iterations={"a": 1000, "b": 1000},
+        full_refit_iterations={"a": refit_cap, "b": refit_cap},
+        full_training_rows={"a": 1600, "b": 1600},
+        completion_refit_rows=(1400, 1800),
+        profile_completion=profile_completion,
+    )
+    refit_scale = refit_cap / 20 if refit_cap is not None else 1.0
+    cv_cost = 12.0 * 1600 / 360
+    refit_cost = 12.0 * 3200 / 360 * refit_scale
+    assert len(calls) == 4
+    assert result.initial_cost_estimates["a"] == pytest.approx(
+        2.0 / 60 * (1600 + 3200 * refit_scale)
+    )
+    assert result.cost_estimates["a"] == pytest.approx(cv_cost + refit_cost)
+    forecast = result.completion_costs["a"]
+    assert forecast["additional_cv_s"] == pytest.approx(2 * cv_cost)
+    assert forecast["estimated_s"] == pytest.approx(3 * cv_cost + refit_cost + 8.0)
+    diagnostic = result.cost_model["a"]
+    assert diagnostic["predicted_confirmation_s"] == pytest.approx(12.0)
+    assert diagnostic["full_iteration_cap"] == 1000
+    assert diagnostic["full_refit_iteration_cap"] == refit_cap
+
+
+@pytest.mark.parametrize("observed", [None, 0, -1])
+@pytest.mark.parametrize("with_profiles", [False, True])
+def test_refit_forecast_requires_observed_iterations_for_known_cap(
+    observed: int | None, with_profiles: bool
+) -> None:
+    def profile_completion(names: tuple[str, ...]) -> dict[str, dict[str, object]]:
+        return {
+            name: {
+                "fs": {"estimated_s": 0.0},
+                "hpo": {"estimated_s": 0.0},
+                "additional_cv_count": 2,
+            }
+            for name in names
+        }
+
+    result = probe_models(
+        ["a", "b"],
+        folds(),
+        y=np.arange(1400.0),
+        groups=None,
+        task=Task(kind="regression"),
+        metric=Metric(),
+        config=SearchConfig(max_rows=100, confirmation_rows=600),
+        seed=1,
+        evaluate=lambda name, parts, iterations: Candidate(
+            name, 0.9, train_time=12.0, cv_iterations=observed
+        ),
+        full_iterations={"a": None, "b": None},
+        full_refit_iterations={"a": 1000, "b": None},
+        profile_completion=profile_completion if with_profiles else None,
+        full_training_rows={"a": 1600, "b": 1600},
+        completion_refit_rows=(1400, 1800),
+    )
+    assert result.cost_estimates["a"] is None
+    assert result.initial_cost_estimates["a"] is None
+    assert result.cost_estimates["b"] == pytest.approx(160.0)
+    assert result.cost_model["a"]["status"] == "unavailable"
+    assert result.cost_model["a"]["reason"] == "missing_cv_iterations"
+    assert result.cost_model["a"]["predicted_confirmation_s"] == pytest.approx(72.0)
+    if with_profiles:
+        assert result.completion_costs["a"]["estimated_s"] is None
+        assert result.completion_costs["a"]["additional_cv_s"] == pytest.approx(12 * 1600 / 360 * 2)
 
 
 @pytest.mark.parametrize(
@@ -230,3 +328,22 @@ def test_failed_factory_is_isolated_from_resource_plan_collection() -> None:
     assert result.best_model_id == "linear"
     assert result.search["model_failures"][0][0] == "broken"
     assert "invalid native constructor" in result.search["model_failures"][0][1]
+
+
+def test_selection_only_forecast_does_not_require_refit_iterations() -> None:
+    result = probe_models(
+        ["a", "b"],
+        folds(),
+        y=np.arange(1400.0),
+        groups=None,
+        task=Task(kind="regression"),
+        metric=Metric(),
+        config=SearchConfig(max_rows=100, confirmation_rows=600),
+        seed=1,
+        evaluate=lambda name, parts, iterations: Candidate(name, 0.9, train_time=12.0),
+        full_iterations={"a": 1000, "b": 1000},
+        full_refit_iterations={"a": 1000, "b": 1000},
+        completion_refit_rows=(),
+    )
+    assert result.cost_estimates == pytest.approx({"a": 12 * 1600 / 360, "b": 12 * 1600 / 360})
+    assert result.cost_model["a"]["status"] == "conditional"

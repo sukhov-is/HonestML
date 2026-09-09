@@ -495,7 +495,7 @@ def profile_tuning_cost(
                         ctx=ctx,
                         stage="scouting",
                     )
-                    count = candidate.refit_iterations
+                    count = candidate.cv_iterations
                     if (
                         count is None
                         or count < 1

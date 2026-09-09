@@ -655,6 +655,7 @@ def run_slice(
         )
 
         full_iterations: dict[str, int | None] = {}
+        full_refit_iterations: dict[str, int | None] = {}
         full_training_rows: dict[str, int] = {}
 
         def evaluate_probe(
@@ -679,6 +680,11 @@ def run_slice(
                 )
                 full_iterations[name] = (
                     est.iteration_limit(early_stopping=any(f.es_idx.size for f in folds))
+                    if isinstance(est, SupportsIterationPlan)
+                    else None
+                )
+                full_refit_iterations[name] = (
+                    est.iteration_limit(early_stopping=False)
                     if isinstance(est, SupportsIterationPlan)
                     else None
                 )
@@ -838,6 +844,7 @@ def run_slice(
                     block_index=block_index,
                     times=times,
                     full_iterations=full_iterations,
+                    full_refit_iterations=full_refit_iterations,
                     full_training_rows=full_training_rows,
                     completion_refit_rows=completion_refit_rows,
                     profile_completion=profile_completion
@@ -863,7 +870,7 @@ def run_slice(
                     "model": c.id,
                     "score": c.score,
                     "elapsed_s": c.train_time,
-                    "iterations": c.refit_iterations,
+                    "iterations": c.cv_iterations,
                 }
                 for c in probe.confirmations
             ],
@@ -878,7 +885,7 @@ def run_slice(
             "initial_estimated_cv_refit_s": probe.initial_cost_estimates,
             "cost_model": probe.cost_model,
             "completion_refit_rows": list(completion_refit_rows),
-            "cost_estimate_basis": "probe_elapsed_scaled_by_actual_cv_training_and_planned_refit_rows; native_ceiling_extrapolated",
+            "cost_estimate_basis": "probe_elapsed_scaled_separately_by_cv_stopping_and_configured_refit_budget",
             "cost_estimate_excludes": ["fs", "hpo", "feature_width_changes", "total_run_wall"],
             "model_margin": search.model_margin,
             "threads": search.threads,
@@ -1707,7 +1714,7 @@ def _run_candidate(
         oof_pred=captured,
         oof_mask=mask if captured is not None else None,
         oof_proba=proba_channel,
-        refit_iterations=max(1, int(np.median(iteration_counts))) if iteration_counts else None,
+        cv_iterations=max(1, int(np.median(iteration_counts))) if iteration_counts else None,
     )
 
 
@@ -1815,10 +1822,9 @@ def refit_best(
     *,
     factory: EstimatorFactory,
     ctx: RunContext | None = None,
-    iterations: int | None = None,
     model_id: str = "winner",
 ) -> Estimator:
-    """Refit the winning model on the full training data (es tail included)."""
+    """Refit on all training rows using the selected factory's configured parameters."""
     y = dataset.target()
     if y is None:
         raise SchemaValidationError("refit_best requires a target column")
@@ -1837,8 +1843,6 @@ def refit_best(
     # shipped model trains native-consistently with the leaderboard — and the manifest n_cat is post-gate.
     if isinstance(est, SupportsNativeCategorical):
         est.categorical_indices = schema.categorical_indices(task.native_cat_max_unique)
-    if iterations is not None and isinstance(est, SupportsIterationBudget):
-        est.set_refit_iterations(iterations)
     matrix = design_matrix(dataset)
     fit_scope: AbstractContextManager[dict[str, int | None]] = (
         ctx.timed_fit("refit", model_id=model_id, rows=dataset.n_rows, columns=matrix.shape[1])
@@ -1849,4 +1853,5 @@ def refit_best(
         est.fit(matrix, y, sample_weight=dataset.sample_weight())
         if isinstance(est, SupportsIterationBudget):
             resources["iterations"] = est.fitted_iterations
+            resources["tree_budget"] = est.iteration_budget
     return est

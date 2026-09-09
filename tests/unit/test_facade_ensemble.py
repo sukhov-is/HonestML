@@ -232,3 +232,74 @@ def test_ensemble_applied_ships_blended(_complementary, tmp_path) -> None:
     assert manifest["best_model_id"] == "ensemble" and manifest["ensemble"]["applied"] is True
     loaded = load_artifact(art)
     assert np.allclose(loaded.predict_proba(X), m.predict_proba(X))
+
+
+def test_applied_ensemble_preserves_member_factory_budgets_on_dev_and_full_refit(
+    _complementary: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from honestml import CVConfig
+
+    def reject_override(self: _PartialClf, count: int) -> None:
+        pytest.fail(f"factory budget must not be replaced with observed rounds: {count}")
+
+    monkeypatch.setattr(_PartialClf, "fitted_iterations", property(lambda self: 7), raising=False)
+    monkeypatch.setattr(
+        _PartialClf,
+        "iteration_budget",
+        property(lambda self: 31 if self.cols == (0,) else 53),
+        raising=False,
+    )
+    monkeypatch.setattr(_PartialClf, "set_refit_iterations", reject_override, raising=False)
+    original_fit = _PartialClf.fit
+    member_refits: list[tuple[int, tuple[int, ...], int]] = []
+
+    def record_fit(
+        self: _PartialClf,
+        X: np.ndarray,
+        y: np.ndarray,
+        X_val: np.ndarray | None = None,
+        y_val: np.ndarray | None = None,
+        sample_weight: np.ndarray | None = None,
+    ) -> _PartialClf:
+        if len(X) in (320, 400):
+            member_refits.append((len(X), self.cols, self.iteration_budget))
+        return original_fit(self, X, y, X_val, y_val, sample_weight)
+
+    monkeypatch.setattr(_PartialClf, "fit", record_fit)
+    x, y = _complementary_data()
+    model = AutoML(
+        task="binary",
+        metric="roc_auc",
+        models=("pa", "pb"),
+        random_state=0,
+        cv=CVConfig(n_splits=3, outer_holdout=0.2, calibrate="off"),
+        significance="off",
+        ensemble=EnsembleConfig(n_bags=1),
+        finalize=True,
+    ).fit(x, y)
+    block = model.run_report_["ensemble"]
+    assert block["applied"] is True and block["gate_reason"] == "significant_improvement"
+    assert set(block["weights"]) == {"pa", "pb"}
+    assert all(weight > 0 for weight in block["weights"].values())
+    assert isinstance(model.best_estimator_, BlendedEstimator)
+    refits = [row for row in model.run_report_["cost"]["work"] if row["stage"] == "refit"]
+    assert sorted((row["rows"], row["tree_budget"]) for row in refits) == [
+        (320, 31),
+        (320, 53),
+        (400, 31),
+        (400, 53),
+    ]
+    assert sorted(member_refits) == [
+        (320, (0,), 31),
+        (320, (1,), 53),
+        (400, (0,), 31),
+        (400, (1,), 53),
+    ]
+    assert all(row["status"] == "completed" and row["iterations"] == 7 for row in refits)
+    members = model.best_estimator_.members
+    assert sorted((member.cols, member.iteration_budget) for member in members) == [
+        ((0,), 31),
+        ((1,), 53),
+    ]
+    assert all(member.random_state == 0 and member._m.max_iter == 500 for member in members)
+    assert model.predict_proba(x).shape == (400, 2)

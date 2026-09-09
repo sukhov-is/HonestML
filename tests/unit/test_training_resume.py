@@ -1,4 +1,4 @@
-"""Facade integration for checkpoint reuse, DEV refit rounds and cooperative HPO stopping."""
+"""Facade integration for checkpoint reuse, factory refit budgets and cooperative HPO stopping."""
 
 from __future__ import annotations
 
@@ -85,15 +85,23 @@ class _Fit:
     tuned: bool
     requested_rounds: int | None
     used_rounds: int
+    tree_budget: int
 
 
 class _RoundEstimator:
     def __init__(
-        self, fits: list[_Fit], *, tuned: bool, bias: float, on_tuned_fit: Callable[[], None] | None
+        self,
+        fits: list[_Fit],
+        *,
+        tuned: bool,
+        bias: float,
+        on_tuned_fit: Callable[[], None] | None,
+        tree_budget: int = 30,
     ) -> None:
         self.feature_names: list[str] = []
         self.fitted_iterations: int | None = None
-        self.iteration_budget: int | None = None
+        self.iteration_budget = tree_budget
+        self._factory_budget = tree_budget
         self._requested: int | None = None
         self._fits = fits
         self._tuned = tuned
@@ -114,9 +122,18 @@ class _RoundEstimator:
         self.fitted_iterations = (
             self._requested if self._requested is not None else 3 + int(X[:, 0].sum()) % 7
         )
-        self.iteration_budget = self._requested if self._requested is not None else 30
+        self.iteration_budget = (
+            self._requested if self._requested is not None else self._factory_budget
+        )
         self._fits.append(
-            _Fit(len(X), X.shape[1], self._tuned, self._requested, self.fitted_iterations)
+            _Fit(
+                len(X),
+                X.shape[1],
+                self._tuned,
+                self._requested,
+                self.fitted_iterations,
+                self.iteration_budget,
+            )
         )
         if self._tuned and self._on_tuned_fit is not None:
             self._on_tuned_fit()
@@ -131,13 +148,19 @@ def _install_round_estimator(
     *,
     tuned_bias: float = 0.0,
     on_tuned_fit: Callable[[], None] | None = None,
+    factory_budget: int = 30,
+    hpo_budget: int | None = None,
 ) -> list[_Fit]:
     fits: list[_Fit] = []
     original = facade_mod.build_default_components
 
     def factory(params: Mapping[str, Any]) -> Callable[[], _RoundEstimator]:
         return lambda: _RoundEstimator(
-            fits, tuned=bool(params), bias=tuned_bias if params else 0.0, on_tuned_fit=on_tuned_fit
+            fits,
+            tuned=bool(params),
+            bias=tuned_bias if params else 0.0,
+            on_tuned_fit=on_tuned_fit,
+            tree_budget=params.get("n_estimators", factory_budget),
         )
 
     def build(*args: Any, **kwargs: Any) -> Components:
@@ -145,42 +168,78 @@ def _install_round_estimator(
         return components._replace(
             estimators={"linear": factory({})},
             make_factory=lambda name, params: factory(params),
-            tunable={"linear": {"regularization": {"type": "float", "low": 0.1, "high": 1.0}}},
+            tunable={
+                "linear": {"n_estimators": {"type": "categorical", "choices": [hpo_budget]}}
+                if hpo_budget is not None
+                else {"regularization": {"type": "float", "low": 0.1, "high": 1.0}}
+            },
         )
 
     monkeypatch.setattr(facade_mod, "build_default_components", build)
     return fits
 
 
-def test_cached_dev_round_median_survives_both_refits(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("factory_budget", "hpo_budget"),
+    [(30, None), (53, None), (30, 73)],
+    ids=["default", "explicit", "hpo"],
+)
+def test_cached_factory_budget_survives_both_refits(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    factory_budget: int,
+    hpo_budget: int | None,
 ) -> None:
-    fits = _install_round_estimator(monkeypatch)
+    fits = _install_round_estimator(
+        monkeypatch, factory_budget=factory_budget, hpo_budget=hpo_budget
+    )
     x, y = _data()
     options = _options(tmp_path)
     options["feature_selection"] = None
+    if hpo_budget is None:
+        options["hpo"] = None
+    expected_budget = factory_budget if hpo_budget is None else hpo_budget
     cold = AutoML(**options).fit(x, y)
     fold_counts = [
         row["iterations"] for row in cold.run_report_["cost"]["work"] if row["stage"] == "cv"
     ]
-    expected = int(np.median(fold_counts))
     assert len(fold_counts) == 3 and len(set(fold_counts)) > 1
-    assert [(fit.rows, fit.requested_rounds) for fit in fits[-2:]] == [
-        (72, expected),
-        (96, expected),
+    assert int(np.median(fold_counts)) != expected_budget
+    assert [(fit.rows, fit.requested_rounds, fit.tree_budget) for fit in fits[-2:]] == [
+        (72, None, expected_budget),
+        (96, None, expected_budget),
     ]
-    assert cold.best_estimator_.fitted_iterations == expected
+    assert cold.best_estimator_.iteration_budget == expected_budget
+    if hpo_budget is not None:
+        assert cold.run_report_["hpo"]["tuned"]["linear"]["chosen_params"] == {
+            "n_estimators": hpo_budget
+        }
+        assert all(fit.tuned for fit in fits[-2:])
     fits.clear()
     warm = AutoML(**options).fit(x, y)
-    assert [(fit.rows, fit.requested_rounds) for fit in fits] == [(72, expected), (96, expected)]
+    assert [(fit.rows, fit.requested_rounds, fit.tree_budget) for fit in fits] == [
+        (72, None, expected_budget),
+        (96, None, expected_budget),
+    ]
+    assert {row["stage"] for row in warm.run_report_["cost"]["work"]} == {"refit"}
     assert warm.holdout_score_ == cold.holdout_score_ == 0.0
-    assert warm.best_estimator_.fitted_iterations == expected
+    assert warm.best_estimator_.iteration_budget == expected_budget
 
 
-def test_hpo_wide_fallback_reuses_original_factory_and_dev_rounds(
+def test_hpo_wide_fallback_reuses_original_factory_budget(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    fits = _install_round_estimator(monkeypatch, tuned_bias=20.0)
+    class Ranker:
+        name = "importance"
+
+        def auto_threshold(self, n_features: int) -> float:
+            return 0.0
+
+        def rank(self, x: np.ndarray, y: np.ndarray, **kwargs: Any) -> np.ndarray:
+            return np.arange(x.shape[1], 0, -1, dtype=float)
+
+    monkeypatch.setattr(build_mod, "_resolve_feature_ranker", lambda task, fs: Ranker())
+    fits = _install_round_estimator(monkeypatch, tuned_bias=20.0, factory_budget=53, hpo_budget=73)
     x, y = _data()
     options = _options(tmp_path)
     options["search"] = SearchConfig(max_rows=48, model_iterations=3)
@@ -188,21 +247,28 @@ def test_hpo_wide_fallback_reuses_original_factory_and_dev_rounds(
     assert cold.run_report_["search"]["final_control"] == "wide_control"
     assert cold.schema_.selected_features is None
     assert cold.run_report_["hpo"]["tuned_on"] == "fs_subset"
+    assert cold.run_report_["hpo"]["tuned"]["linear"]["chosen_params"] == {"n_estimators": 73}
     counts = [
         row["iterations"]
         for row in cold.run_report_["cost"]["work"]
         if row["stage"] == "wide_control"
     ]
-    expected = int(np.median(counts))
+    assert int(np.median(counts)) != 53
     assert all(
-        not fit.tuned and fit.columns == 3 and fit.requested_rounds == expected for fit in fits[-2:]
+        not fit.tuned
+        and fit.columns == 3
+        and fit.requested_rounds is None
+        and fit.tree_budget == 53
+        for fit in fits[-2:]
     )
+    assert cold.best_estimator_.iteration_budget == 53
     np.testing.assert_array_equal(cold.predict(x), y)
     fits.clear()
     warm = AutoML(**options).fit(x, y)
     assert len(fits) == 2 and all(
-        not fit.tuned and fit.requested_rounds == expected for fit in fits
+        not fit.tuned and fit.requested_rounds is None and fit.tree_budget == 53 for fit in fits
     )
+    assert warm.best_estimator_.iteration_budget == 53
     np.testing.assert_array_equal(warm.predict(x), y)
 
 

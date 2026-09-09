@@ -45,7 +45,8 @@ class Candidate:
     # raw out-of-fold probabilities for the calibrator (ADR-0030 §1 / ADR-0031 §3): a SEPARATE
     # channel from the metric-ready oof_pred (which may be class/value); the band ignores it.
     oof_proba: np.ndarray | None = None
-    refit_iterations: int | None = None
+    # median observed CV rounds, used for diagnostics and cost estimation.
+    cv_iterations: int | None = None
 
 
 class SelectionPolicy(BaseModel):

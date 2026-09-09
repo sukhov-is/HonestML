@@ -86,10 +86,10 @@ class SupportsIterationPlan(Protocol):
 
 @runtime_checkable
 class SupportsIterationBudget(Protocol):
-    """Models transferring DEV-selected boosting rounds to full-data refit.
+    """Models exposing observed rounds and accepting explicit iteration budgets.
 
     ``fitted_iterations`` is a count, never a zero-based index, and is ``None`` before fit.
-    The application aggregates completed DEV folds and applies that count before refit.
+    Refit preserves factory parameters; observed CV counts describe completed work.
     """
 
     @property

@@ -58,7 +58,6 @@ from honestml.core import (
 from honestml.core.config import RunMode, SignificanceMode
 from honestml.core.ports.estimator import (
     SupportsFitContext,
-    SupportsIterationBudget,
     SupportsRankerBudget,
     SupportsThreadLimit,
 )
@@ -613,20 +612,6 @@ class AutoML(BaseEstimator, ClassifierMixin):
                 time_budget=budget is not None and budget.mode == "time",
             )
 
-        def refit_factory(factory: EstimatorFactory, iterations: int) -> EstimatorFactory:
-            def make() -> Estimator:
-                estimator = factory()
-                if isinstance(estimator, SupportsIterationBudget):
-                    estimator.set_refit_iterations(iterations)
-                return estimator
-
-            return make
-
-        for candidate in result.candidates:
-            if candidate.refit_iterations is not None:
-                components.estimators[candidate.id] = refit_factory(
-                    components.estimators[candidate.id], candidate.refit_iterations
-                )
         # cache observability (F4.7): a cold run next to other fingerprint directories means the
         # resolved config or the data signature changed — name the fingerprint so the user can
         # diff the two run_report configs instead of guessing why everything recomputed.
@@ -1253,7 +1238,7 @@ class AutoML(BaseEstimator, ClassifierMixin):
                 "run_mode": self.run_mode,
                 "finalize": self.finalize,
                 "refit_rows": completion_refit_rows,
-                "completion_cost_version": 2,
+                "completion_cost_version": 3,
             }
             if self.search is not None
             else None,
@@ -1416,9 +1401,6 @@ class AutoML(BaseEstimator, ClassifierMixin):
                 task,
                 factory=components.estimators[result.best_model_id],
                 ctx=ctx,
-                iterations=next(
-                    c.refit_iterations for c in result.candidates if c.id == result.best_model_id
-                ),
                 model_id=result.best_model_id,
             )
         block = _ensemble_report(ensemble_outcome) if ensemble_outcome is not None else None
