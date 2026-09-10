@@ -54,3 +54,12 @@ docs/architecture/
 docs/audit/
 docs/implementation/
 blog/
+
+# local agent harness
+/.CLAUDE/
+/.agents/
+/.codex/
+/AGENTS.md
+/docs/loop/
+/ops/loop/
+/ops/final-evidence-review.md
